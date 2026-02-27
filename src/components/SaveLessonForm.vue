@@ -10,15 +10,10 @@
         <q-card-section class="card-body">
           <div class="row q-col-gutter-md">
             <div class="col-12 col-md-6">
-              <q-input v-model="lesson.book" label="Book" stack-label :disable="pendingCheck" />
+              <q-input v-model="lesson.book" label="Book" stack-label />
             </div>
             <div class="col-12 col-md-6">
-              <q-input
-                v-model="lesson.lessonNumber"
-                label="Lesson #"
-                stack-label
-                :disable="pendingCheck"
-              />
+              <q-input v-model="lesson.lessonNumber" label="Lesson #" stack-label />
             </div>
           </div>
 
@@ -47,11 +42,26 @@
             stack-label
             :disable="pendingCheck"
           />
+          <q-input
+            v-model="lesson.homeworkPages"
+            label="Homework Pages"
+            stack-label
+            placeholder="Ex: 12-13, 15"
+            class="q-mt-md"
+            :disable="noHomework"
+          />
           <q-toggle
             label="Pending Check"
             v-model="pendingCheck"
             keep-color
             icon="hourglass_top"
+            size="xl"
+          ></q-toggle>
+          <q-toggle
+            label="No Homework"
+            v-model="noHomework"
+            keep-color
+            icon="block "
             size="xl"
           ></q-toggle>
         </q-card-section>
@@ -79,6 +89,7 @@ const props = defineProps({
 })
 
 const pendingCheck = ref(false)
+const noHomework = ref(false) // true when student brought none
 
 const emit = defineEmits(['update:modelValue', 'lessonSaved'])
 
@@ -88,6 +99,7 @@ const lesson = ref({
   book: '',
   lessonNumber: '',
   notes: '',
+  homeworkPages: '', // comma-separated list of pages handed in
 })
 
 const gradeOptions = [
@@ -134,10 +146,12 @@ watch(
 
       endOfBook.value = false
       pendingCheck.value = false
+      noHomework.value = false
       for (const field of gradeFields) {
         lesson.value[field.key] = ''
       }
       lesson.value.notes = ''
+      lesson.value.homeworkPages = ''
     }
   },
 )
@@ -149,6 +163,7 @@ const submitLesson = async () => {
   emit('lessonSaved', {
     lesson: lesson.value,
     pendingCheck: pendingCheck.value,
+    noHomework: noHomework.value,
   })
   isOpen.value = false
 }
@@ -162,6 +177,9 @@ watch(pendingCheck, (val) => {
         lesson.value.notes = 'Checar próxima aula'
       }
     })
+    // drop any homework pages and reset flag when marking pending
+    lesson.value.homeworkPages = ''
+    noHomework.value = false
   }
 })
 </script>
