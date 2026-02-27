@@ -21,30 +21,30 @@
     </div>
 
     <div class="list-container q-mt-md q-pa-sm">
-        <div class="text-h3">Lista de Turmas</div>
+      <div class="text-h3">Lista de Turmas</div>
 
-        <div class="text-subtitle2 text-weight-regular text-grey-9">
-          Você tem {{ teacherClasses.length }} turma(s) cadastrada(s).
-        </div>
-
-        <q-list bordered separator>
-          <q-item
-            v-for="classItem in filteredClasses"
-            :key="classItem.id"
-            clickable
-            @click="$router.push({ name: 'ClassDetails', params: { id: classItem.id } })"
-          >
-            <q-item-section>
-              <q-item-label
-                ><strong> {{ classItem.className }}</strong>
-              </q-item-label>
-              <q-item-label class="text-subtitle2 text-weight-regular text-grey-9">
-                Quantidade de alunos: {{ classItem.studentIds.length }}
-              </q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
+      <div class="text-subtitle2 text-weight-regular text-grey-9">
+        Você tem {{ teacherClasses.length }} turma(s) cadastrada(s).
       </div>
+
+      <q-list bordered separator>
+        <q-item
+          v-for="classItem in filteredClasses"
+          :key="classItem.id"
+          clickable
+          @click="$router.push({ name: 'ClassDetails', params: { id: classItem.id } })"
+        >
+          <q-item-section>
+            <q-item-label
+              ><strong> {{ classItem.className }}</strong>
+            </q-item-label>
+            <q-item-label class="text-subtitle2 text-weight-regular text-grey-9">
+              Quantidade de alunos: {{ classItem.studentIds.length }}
+            </q-item-label>
+          </q-item-section>
+        </q-item>
+      </q-list>
+    </div>
   </div>
 </template>
 
@@ -76,7 +76,7 @@ const filteredClasses = computed(() => {
   const query = searchQuery.value.toLowerCase()
   return teacherClasses.value.filter((classItem) => {
     const daysMatch = Array.isArray(classItem.classDays)
-      ? classItem.classDays.some((day) => day.toLowerCase().includes(query))
+      ? classItem.classDays.some((day) => String(day).toLowerCase().includes(query))
       : false
 
     const scheduleMatch = classItem.schedule.toLowerCase().includes(query)
@@ -153,5 +153,4 @@ const filteredClasses = computed(() => {
     text-align: center;
   }
 }
-
 </style>
