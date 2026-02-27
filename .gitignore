@@ -51,3 +51,4 @@ key//configKey.js
 # --- Temporary files ---
 *.local
 *.tmp
+.todo
