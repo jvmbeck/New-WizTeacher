@@ -103,23 +103,29 @@ watch(
   () => props.classData,
   (newData) => {
     if (newData) {
-      form.value.classDays = newData.classDays
-      form.value.schedule = newData.schedule
-      form.value.teacherId = newData.teacherId
-      form.value.classType = newData.classType
-      form.value.classDuration = newData.classDuration
+      form.value = {
+        // classDays might come from older records as strings, convert to numbers for the select
+        classDays: (newData.classDays || []).map((d) => Number(d)),
+        schedule: newData.schedule || '',
+        teacherId: newData.teacherId || '',
+        classType: newData.classType || '',
+        classDuration: newData.classDuration || 30,
+      }
     }
   },
-  { immediate: true }, // Also runs the first time if data is already available
+  // Also runs the first time if data is already available
+  { immediate: true },
 )
 
+// days stored as numbers; 0=Domingo, 1=Segunda, … 6=Sábado
 const daysOfWeek = [
-  { label: 'Segunda', value: 'Segunda' },
-  { label: 'Terça', value: 'Terça' },
-  { label: 'Quarta', value: 'Quarta' },
-  { label: 'Quinta', value: 'Quinta' },
-  { label: 'Sexta', value: 'Sexta' },
-  { label: 'Sábado', value: 'Sábado' },
+  { label: 'Domingo', value: 0 },
+  { label: 'Segunda', value: 1 },
+  { label: 'Terça', value: 2 },
+  { label: 'Quarta', value: 3 },
+  { label: 'Quinta', value: 4 },
+  { label: 'Sexta', value: 5 },
+  { label: 'Sábado', value: 6 },
 ]
 
 const classTypes = [
