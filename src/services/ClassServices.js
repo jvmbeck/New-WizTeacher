@@ -14,7 +14,6 @@ import {
 } from 'firebase/firestore'
 import { db } from '../key/configKey.js'
 import { getNextClassDayKey } from '../utils/dateHelpers.js'
-//import { useUserStore } from '../stores/userStore.js'
 
 const ClassServices = {
   async createClass({ classDays, schedule, teacherId, classType, classDuration }) {
@@ -23,16 +22,16 @@ const ClassServices = {
     }
 
     const dayNamesMap = {
-    0: 'Domingo',
-    1: 'Segunda',
-    2: 'Terça',
-    3: 'Quarta',
-    4: 'Quinta',
-    5: 'Sexta',
-    6: 'Sábado',
-  }
+      0: 'Domingo',
+      1: 'Segunda',
+      2: 'Terça',
+      3: 'Quarta',
+      4: 'Quinta',
+      5: 'Sexta',
+      6: 'Sábado',
+    }
 
-    const dayNames = classDays.map(dayNum => dayNamesMap[dayNum])
+    const dayNames = classDays.map((dayNum) => dayNamesMap[dayNum])
 
     const className = `${dayNames.join('-')} ${schedule} - ${classType}`
 
@@ -90,16 +89,24 @@ const ClassServices = {
       throw new Error('Missing classId or classData')
     }
 
-    const className = classData.classDay + ' ' + classData.schedule + ' - ' + classData.classType
+    const dayNamesMap = {
+      0: 'Domingo',
+      1: 'Segunda',
+      2: 'Terça',
+      3: 'Quarta',
+      4: 'Quinta',
+      5: 'Sexta',
+      6: 'Sábado',
+    }
+
+    const dayNames = classData.classDays.map((dayNum) => dayNamesMap[dayNum])
+
+    const className = `${dayNames.join('-')} ${classData.schedule} - ${classData.classType}`
+
     classData.className = className
     console.log('Updating class data for classId:', classId, 'with data:', classData)
 
     const classRef = doc(db, 'classes', classId)
-    const existing = await getDoc(classRef)
-
-    if (!existing.exists()) {
-      throw new Error('Class does not exist')
-    }
 
     await updateDoc(classRef, classData)
   },
@@ -184,6 +191,6 @@ const ClassServices = {
 
     const replenishments = classInfo.replenishmentStudents || {}
     return replenishments[nextDateKey] || []
-  }
+  },
 }
 export default ClassServices
