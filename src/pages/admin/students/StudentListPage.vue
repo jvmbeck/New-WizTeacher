@@ -18,7 +18,7 @@
         </template>
       </q-input>
       <q-btn @click="isDialogOpen = true">Adicionar Aluno</q-btn>
-      <q-btn @click="RefreshList"  icon="refresh"/>
+      <q-btn @click="RefreshList" icon="refresh" />
     </div>
 
     <q-card>
@@ -44,7 +44,7 @@
                 color="secondary"
                 round
                 dense
-                @click="goToStudentDetails(props.row.uid)"
+                @click="openDetailsDialog(props.row.uid)"
                 class="q-ml-xs"
               />
               <q-btn
@@ -61,7 +61,7 @@
     </q-card>
 
     <CreateStudentDialog v-model="isDialogOpen" @create="handleCreateStudent"></CreateStudentDialog>
-
+    <StudentDetailsDialog v-model="isDetailsOpen" :student-id="selectedStudentId" />
   </q-page>
 </template>
 
@@ -69,29 +69,28 @@
 import { useStudentStore } from 'src/stores/studentStore'
 import { useClassStore } from 'src/stores/classStore'
 import { onMounted, computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { storeToRefs } from 'pinia'
 import CreateStudentDialog from 'src/components/admin-students/students/CreateStudentDialog.vue'
+import StudentDetailsDialog from 'src/components/admin-students/students/StudentDetailsDialog.vue'
 
-const router = useRouter()
-
-function goToStudentDetails(studentId) {
-  router.push({ name: 'studentDetails', params: { studentId: studentId } })
+function openDetailsDialog(studentId) {
+  selectedStudentId.value = studentId
+  isDetailsOpen.value = true
 }
 
 const $q = useQuasar()
 
 const isDialogOpen = ref(false)
+const isDetailsOpen = ref(false)
+const selectedStudentId = ref(null)
 
 const handleCreateStudent = async (newStudent) => {
   try {
-
     console.log('Creating student:', newStudent.name)
     await studentStore.createStudent(newStudent)
     $q.notify({ type: 'positive', message: 'Aluno criado com sucesso' })
     isDialogOpen.value = false
-
   } catch (err) {
     console.error(err)
     $q.notify({ type: 'negative', message: 'Falha ao criar aluno' })
@@ -134,20 +133,29 @@ const searchQuery = ref('')
 
 const filteredStudents = computed(() => {
   const query = searchQuery.value.toLowerCase()
-  return students.value.filter((student) => {
-    const name = student.name?.toLowerCase() || ''
-    const book = student.book?.toLowerCase() || ''
 
-    const classIds = Array.isArray(student.classIds)
-      ? student.classIds
-      : student.classId
-        ? [student.classId]
-        : []
+  return students.value
+    .map((student) => {
+      const classIds = Array.isArray(student.classIds)
+        ? student.classIds
+        : student.classId
+          ? [student.classId]
+          : []
 
-    const classNames = classIds.map((id) => classMap.value[id]?.toLowerCase() || '').join(' ')
+      const classNames = classIds.map((id) => classMap.value[id] || '—').join(', ')
 
-    return name.includes(query) || book.includes(query) || classNames.includes(query)
-  })
+      return {
+        ...student,
+        classes: classNames,
+      }
+    })
+    .filter((student) => {
+      const name = student.name?.toLowerCase() || ''
+      const book = student.book?.toLowerCase() || ''
+      const classNames = student.classes.toLowerCase()
+
+      return name.includes(query) || book.includes(query) || classNames.includes(query)
+    })
 })
 
 const RefreshList = async () => {
@@ -159,20 +167,7 @@ const columns = [
   { name: 'book', label: 'Livro', field: 'book', sortable: true },
   { name: 'currentLesson', label: 'Lição Atual', field: 'currentLesson', sortable: true },
   { name: 'totalAbsences', label: 'Faltas', field: 'totalAbsences', sortable: true },
-  {
-    name: 'classes',
-    label: 'Turmas',
-    field: 'classIds',
-    format: (val, row) => {
-      const classIds = Array.isArray(row.classIds) ? row.classIds : row.classId ? [row.classId] : []
-
-      if (classIds.length > 0) {
-        return classIds.map((id) => classMap.value[id] || '—').join(', ')
-      }
-      return '—'
-    },
-    sortable: false,
-  },
+  { name: 'classes', label: 'Turmas', field: 'classes', sortable: false },
   { name: 'actions', label: '', field: 'id' },
 ]
 </script>
