@@ -3,11 +3,28 @@
     <q-btn to="/AdminDashboard/classList" label="Voltar" color="primary" class="q-mb-md" />
 
     <q-card>
-      <q-btn label="Editar Turma" icon="edit" @click="editDialog = true" class="q-mb-md" />
+      <StudentDetailsDialog v-model="isDetailsOpen" :student-id="detailStudentId" />
+
       <q-card-section>
-        <div class="text-h5">Detalhes da Turma</div>
+        <div>
+          <div class="text-h4 text-center">{{ classData.className }}</div>
+        </div>
+
+        <div class="text-h5">
+          Detalhes da Turma <q-btn icon="edit" @click="editDialog = true" />
+        </div>
         <div v-if="classData">
-          <p><strong>Dias:</strong> {{ classData.classDays.join(', ') }}</p>
+          <p>
+            <strong>Dias:</strong>
+            {{ classData.classDays.map((d) => dayNamesMap[d] || d).join(', ') }}
+          </p>
+          <p>
+            <strong>Próxima aula: </strong>
+            <span v-if="nextClassDateFormatted"
+              >Dia {{ nextClassDateDay }} ({{ nextClassDateFormatted }})</span
+            >
+            <span v-else>Não foi possível determinar</span>
+          </p>
           <p><strong>Horário:</strong> {{ classData.schedule }}</p>
           <p><strong>Duração:</strong> {{ classData.classDuration }} minutos</p>
           <p><strong>Professor:</strong> {{ teacherName }}</p>
@@ -196,16 +213,44 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore'
 import { db } from 'src/key/configKey.js'
+import StudentDetailsDialog from 'src/components/admin-students/students/StudentDetailsDialog.vue'
 import dayjs from 'dayjs'
 import ClassServices from 'src/services/ClassServices.js'
 import { unscheduleStudent, addReplenishmentStudent } from 'src/services/students/index.js'
 import { getNextClassDayKey } from 'src/utils/dateHelpers.js'
 import UpdateClassDialog from 'src/components/UpdateClassDialog.vue'
+
+// helper for day names
+const dayNamesMap = {
+  0: 'Domingo',
+  1: 'Segunda',
+  2: 'Terça',
+  3: 'Quarta',
+  4: 'Quinta',
+  5: 'Sexta',
+  6: 'Sábado',
+}
+
+const nextClassDateKey = computed(() => {
+  if (!classData.value) return null
+  return getNextClassDayKey(classData.value)
+})
+
+const nextClassDateFormatted = computed(() => {
+  if (!nextClassDateKey.value) return null
+  // Format as DD/MM/YYYY
+  return dayjs(nextClassDateKey.value).format('DD/MM/YYYY')
+})
+
+const nextClassDateDay = computed(() => {
+  if (!nextClassDateKey.value) return null
+  return dayjs(nextClassDateKey.value).date()
+})
 
 const route = useRoute()
 const $q = useQuasar()
@@ -214,14 +259,13 @@ const classId = route.params.classId
 const editDialog = ref(false)
 const isAddDialogOpen = ref(false)
 const isAddReplenishmentDialogOpen = ref(false)
-const isDialogOpen = ref(false)
-const selectedStudent = ref(null)
-const lessons = ref([])
-const loadingLessons = ref(false)
 const classData = ref(null)
 const students = ref([])
 const teacherName = ref('')
 const selectedStudentId = ref(null)
+// details dialog state
+const detailStudentId = ref(null)
+const isDetailsOpen = ref(false)
 const availableStudents = ref([]) // { label: 'Name', value: 'id' }
 const classInfo = ref(null)
 const filteredStudents = ref([])
@@ -234,19 +278,6 @@ function formatDate(timestamp) {
   }
 }
 */
-async function openStudentDialog(studentId) {
-  const docRef = doc(db, 'students', studentId)
-  const docSnap = await getDoc(docRef)
-  if (docSnap.exists()) {
-    selectedStudent.value = docSnap.data()
-    selectedStudent.value.id = docSnap.id // Add the document ID to the student object
-    await fetchLessons(studentId)
-    classInfo.value = await ClassServices.fetchClassById(classId)
-    isDialogOpen.value = true
-  } else {
-    console.error('Aluno não encontrado.')
-  }
-}
 
 function openAddStudentDialog() {
   fetchAvailableStudents()
@@ -258,6 +289,11 @@ function openAddReplenishmentStudentDialog() {
   fetchAvailableStudents()
   isAddReplenishmentDialogOpen.value = true
   selectedStudentId.value = null
+}
+
+function openStudentDialog(studentId) {
+  detailStudentId.value = studentId
+  isDetailsOpen.value = true
 }
 /*
 async function removeStudentFromClass(classId, studentId) {
@@ -338,16 +374,6 @@ const addReplenishmentStudentToClass = async (classId, studentId) => {
       : `Reposição desmarcada para data ${date}`,
   })
   isAddReplenishmentDialogOpen.value = false
-}
-
-async function fetchLessons(studentId) {
-  loadingLessons.value = true
-  lessons.value = []
-  const lessonsRef = collection(db, 'lessonsCompleted')
-  const q = query(lessonsRef, where('studentId', '==', studentId))
-  const querySnap = await getDocs(q)
-  lessons.value = querySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-  loadingLessons.value = false
 }
 
 async function fetchClassDetails() {
