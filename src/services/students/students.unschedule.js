@@ -7,7 +7,8 @@ export async function unscheduleStudent(classId, studentId) {
   const classSnap = await getDoc(classRef)
   const studentRef = doc(db, 'students', studentId)
 
-  const studentData = this.fetchStudentById(studentId)
+  // load the student and make sure we have an up‑to‑date absence count
+  const studentData = await this.etchStudentById(studentId)
 
   if (!classSnap.exists()) {
     return { success: false, reason: 'Class not found' }
@@ -51,7 +52,10 @@ export async function unscheduleStudent(classId, studentId) {
       unscheduledStudents: updatedUnschedules,
     })
     batch.update(studentRef, {
-      totalAbsences: studentData.currentAbsences - 1,
+      // studentData comes from fetchStudentById and exposes `totalAbsences`.
+      // fall back to 0 just in case something is missing, but we should
+      // never see the wrong value here.
+      totalAbsences: (studentData?.totalAbsences || 0) - 1,
     })
     batch.delete(globalAbsencesRef)
   } else {
@@ -61,7 +65,7 @@ export async function unscheduleStudent(classId, studentId) {
       unscheduledStudents: updatedUnschedules,
     })
     batch.update(studentRef, {
-      totalAbsences: studentData.currentAbsences + 1,
+      totalAbsences: (studentData?.totalAbsences || 0) + 1,
     })
     batch.set(globalAbsencesRef, {
       studentId,

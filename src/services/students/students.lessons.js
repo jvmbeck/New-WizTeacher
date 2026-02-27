@@ -18,6 +18,32 @@ export async function saveLessonForStudent(studentId, lessonData) {
   const lessonNumber = lessonData.lessonNumber
   const lessonId = `${book}_${lessonNumber}`
 
+  // interpret homework pages; teacher may indicate no homework or supply
+  // ranges such as "12-15".
+  if (lessonData.noHomework) {
+    lessonData.homeworkPages = []
+  } else if (typeof lessonData.homeworkPages === 'string') {
+    const parts = lessonData.homeworkPages
+      .split(/[,;]/)
+      .map((p) => p.trim())
+      .filter((p) => p)
+    const pages = []
+    for (const part of parts) {
+      const rangeMatch = part.match(/^(\d+)-(\d+)$/)
+      if (rangeMatch) {
+        let start = parseInt(rangeMatch[1], 10)
+        let end = parseInt(rangeMatch[2], 10)
+        if (end < start) [start, end] = [end, start]
+        for (let i = start; i <= end; i++) {
+          pages.push(String(i))
+        }
+      } else {
+        pages.push(part)
+      }
+    }
+    lessonData.homeworkPages = pages
+  }
+
   const auth = getAuth()
   const user = auth.currentUser
 
@@ -31,6 +57,7 @@ export async function saveLessonForStudent(studentId, lessonData) {
       ...lessonData,
       checkedAt: serverTimestamp(),
       status: 'completed',
+      noHomework: lessonData.noHomework || false,
       studentId,
       teacherId: user.uid,
       teacherName: userStore.userInfo?.name || 'Unknown Teacher',
@@ -52,6 +79,7 @@ export async function saveLessonForStudent(studentId, lessonData) {
       studentId,
       completedAt: serverTimestamp(),
       checkedAt: 'pending',
+      noHomework: lessonData.noHomework || false,
       teacherId: user.uid,
       teacherName: userStore.userInfo?.name || 'Unknown Teacher',
       status: 'pending',
@@ -67,9 +95,19 @@ export async function saveLessonForStudent(studentId, lessonData) {
   batch.set(globalLessonRef, fullLessonInfo)
 
   if (lessonNumber === currentLesson) {
-    const { nextLesson } = this.getNextLesson(currentLesson, book)
+    const { nextLesson } = getNextLesson(currentLesson, book)
     batch.update(studentRef, {
       currentLesson: nextLesson,
+    })
+  }
+
+  // if pages were provided, append them to the student document's homeworkPages array
+  if (lessonData.homeworkPages && lessonData.homeworkPages.length) {
+    // fetch current pages so we can concatenate the new ones
+    const currentHomeworkPages = studentData.homeworkPages || []
+    const updatedHomeworkPages = [...currentHomeworkPages, ...lessonData.homeworkPages]
+    batch.update(studentRef, {
+      homeworkPages: updatedHomeworkPages,
     })
   }
 

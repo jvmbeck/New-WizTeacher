@@ -98,6 +98,18 @@ export async function updateStudent(studentId, updatedData, oldClassIds = []) {
   return { id: studentId, name, book, currentLesson, classIds: normalizedClassIds }
 }
 
+// lightweight helper for writing arbitrary fields to a student doc. this
+// avoids having to import `db`/`updateDoc` in every consumer and keeps
+// the surface of the student service as the single place all student
+// writes go through.
+export async function patchStudent(studentId, data) {
+  const studentRef = doc(db, 'students', studentId)
+  // caller is responsible for passing only sane/allowed keys
+  await updateDoc(studentRef, data)
+  // return data so callers can update local state if needed
+  return data
+}
+
 export async function deleteStudent(id) {
   try {
     const studentRef = doc(db, 'students', id)
