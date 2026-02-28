@@ -44,7 +44,7 @@
                 color="secondary"
                 round
                 dense
-                @click="goToClassDetailsPage(props.row.id)"
+                @click="goToClassDetailsPage(props.row)"
                 class="q-ml-xs"
               />
             </q-td>
@@ -59,18 +59,22 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { db } from 'src/key/configKey'
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore'
 import { useRouter } from 'vue-router'
+import { useClassStore } from 'src/stores/classStore'
+import { useTeacherStore } from 'src/stores/teacherStore'
 import CreateClassDialog from 'src/components/CreateClassDialog.vue'
 
 const router = useRouter()
-const classList = ref([])
+const classStore = useClassStore()
+const teacherStore = useTeacherStore()
 const loading = ref(true)
 const isCreateClassDialogOpen = ref(false)
 
 const goToClassDetailsPage = (classId) => {
-  router.push({ name: 'classDetailsAdmin', params: { classId: classId } })
+  router.push({
+    name: 'classDetailsAdmin',
+    params: { classId: classId.id },
+  })
 }
 
 const openCreateClassDialog = () => {
@@ -79,49 +83,36 @@ const openCreateClassDialog = () => {
 
 const searchQuery = ref('')
 const filteredClassList = computed(() => {
-  if (!searchQuery.value) return classList.value
-
+  if (!searchQuery.value) return classStore.classes
   const q = searchQuery.value.toLowerCase()
-
-  return classList.value.filter(
+  return classStore.classes.filter(
     (c) =>
       c.className?.toLowerCase().includes(q) ||
-      c.teacherName?.toLowerCase().includes(q) ||
+      teacherStore.getTeacherNameById(c.teacherId)?.toLowerCase().includes(q) ||
       c.classType?.toLowerCase().includes(q),
   )
 })
 
 async function fetchClassList() {
-  const querySnapshot = await getDocs(collection(db, 'classes'))
-  const classPromises = querySnapshot.docs.map(async (docSnap) => {
-    const data = docSnap.data()
-    let teacherName = 'Desconhecido'
-
-    // Get teacher name if available
-    if (data.teacherId) {
-      const teacherRef = doc(db, 'users', data.teacherId)
-      const teacherSnap = await getDoc(teacherRef)
-      if (teacherSnap.exists()) {
-        teacherName = teacherSnap.data().name
-      }
-    }
-
-    return {
-      id: docSnap.id,
-      ...data,
-      teacherName,
-      studentCount: Array.isArray(data.studentIds) ? data.studentIds.length : 0,
-    }
-  })
-
-  classList.value = await Promise.all(classPromises)
+  await classStore.fetchClasses()
+  await teacherStore.fetchTeachers()
 }
 
 const columns = [
   { name: 'className', label: 'Nome da Turma', align: 'left', field: 'className' },
-  { name: 'teacherName', label: 'Professor', align: 'left', field: 'teacherName' },
+  {
+    name: 'teacherName',
+    label: 'Professor',
+    align: 'left',
+    field: (row) => teacherStore.getTeacherNameById(row.teacherId),
+  },
   { name: 'classType', label: 'Tipo de Aula', align: 'left', field: 'classType' },
-  { name: 'studentCount', label: 'Qtd. de Alunos', align: 'center', field: 'studentCount' },
+  {
+    name: 'studentCount',
+    label: 'Qtd. de Alunos',
+    align: 'center',
+    field: (row) => (Array.isArray(row.studentIds) ? row.studentIds.length : 0),
+  },
   { name: 'actions', label: 'Ações', align: 'center', field: 'actions' },
 ]
 
@@ -129,7 +120,7 @@ onMounted(async () => {
   try {
     loading.value = true
     await fetchClassList()
-    console.log('Turmas carregadas:', classList.value)
+    console.log('CLASS LIST PAGE (onMounted): \n\nTurmas carregadas:', classStore.classes)
   } catch (err) {
     console.error('Erro ao buscar turmas:', err)
   } finally {
