@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useClassStore } from 'src/stores/classStore'
 import { storeToRefs } from 'pinia'
 
@@ -126,10 +126,6 @@ const selectedClassIds = ref([])
 const classStore = useClassStore()
 const { classes } = storeToRefs(classStore)
 
-onMounted(() => {
-  classStore.fetchClasses()
-})
-
 const newStudent = ref({
   name: '',
   book: '',
@@ -143,8 +139,9 @@ const newStudent = ref({
 
 watch(
   () => props.modelValue,
-  (val) => {
+  async (val) => {
     if (val) {
+      await classStore.fetchClasses()
       newStudent.value = {
         name: '',
         book: '',
