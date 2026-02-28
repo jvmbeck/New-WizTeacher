@@ -60,20 +60,29 @@
   </q-dialog>
 </template>
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import { getDocs, collection } from 'firebase/firestore'
-import { db } from '../key/configKey.js'
-import ClassServices from '../services/ClassServices.js' // adjust the path if needed
+import { ref, watch, computed } from 'vue'
+import { useTeacherStore } from 'src/stores/teacherStore.js'
+import { useClassStore } from 'src/stores/classStore.js'
+import { storeToRefs } from 'pinia'
 
 const props = defineProps({
   modelValue: Boolean,
 })
 const emit = defineEmits(['update:modelValue', 'classCreated'])
 
+const teacherStore = useTeacherStore()
+const classStore = useClassStore()
+const { teachers } = storeToRefs(teacherStore)
+
 const isOpen = ref(props.modelValue)
 watch(
   () => props.modelValue,
-  (val) => (isOpen.value = val),
+  async (val) => {
+    isOpen.value = val
+    if (val) {
+      await teacherStore.fetchTeachers()
+    }
+  },
 )
 watch(isOpen, (val) => emit('update:modelValue', val))
 
@@ -100,26 +109,28 @@ const classTypes = [
   { label: 'Online', value: 'Online' },
 ]
 
-const teacherOptions = ref([])
-
-const fetchTeachers = async () => {
-  const snapshot = await getDocs(collection(db, 'users'))
-  teacherOptions.value = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    name: doc.data().name,
+const teacherOptions = computed(() => {
+  return teachers.value.map((t) => ({
+    id: t.id,
+    name: t.name,
   }))
-}
+})
 
 const handleCreate = async () => {
   try {
-    await ClassServices.createClass(form.value)
+    await classStore.createClass(form.value)
     emit('classCreated') // notify parent
     isOpen.value = false // close dialog
+    form.value = {
+      classDays: [],
+      schedule: '',
+      teacherId: '',
+      classType: '',
+      classDuration: 120,
+    }
   } catch (err) {
     console.error('Failed to create class:', err.message)
     // optionally show a toast or error message here
   }
 }
-
-onMounted(fetchTeachers)
 </script>
