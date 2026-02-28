@@ -47,7 +47,8 @@ const ClassServices = {
       classDuration,
     }
 
-    await addDoc(collection(db, 'classes'), classData)
+    const docRef = await addDoc(collection(db, 'classes'), classData)
+    return { id: docRef.id, ...classData }
   },
 
   async fetchAllClasses() {
@@ -104,7 +105,12 @@ const ClassServices = {
     const className = `${dayNames.join('-')} ${classData.schedule} - ${classData.classType}`
 
     classData.className = className
-    console.log('Updating class data for classId:', classId, 'with data:', classData)
+    console.log(
+      'CLASS SERVICES: \n\nUpdating class data for classId:',
+      classId,
+      'with data:',
+      classData,
+    )
 
     const classRef = doc(db, 'classes', classId)
 
@@ -139,7 +145,7 @@ const ClassServices = {
     await Promise.all(
       studentIds.map((studentId) => {
         return updateDoc(doc(db, 'students', studentId), {
-          classId: null,
+          classIds: arrayRemove(classId),
         })
       }),
     )
