@@ -43,11 +43,7 @@ const routes = [
         name: 'StudentList',
         component: () => import('src/pages/admin/students/StudentListPage.vue'),
       },
-      {
-        path: 'studentDetails/:studentId',
-        name: 'studentDetails',
-        component: () => import('src/pages/admin/students/StudentDetailsPage.vue'),
-      },
+
       {
         path: 'classList',
         name: 'classList',
@@ -57,6 +53,7 @@ const routes = [
         path: 'classDetails/:classId',
         name: 'classDetailsAdmin',
         component: () => import('src/pages/admin/classes/ClassDetailsAdmin.vue'),
+        props: (route) => ({ classId: route.params.classId }),
       },
       {
         path: 'teacherList',
