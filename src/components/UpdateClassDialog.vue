@@ -66,11 +66,10 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { getDocs, collection } from 'firebase/firestore'
-import { db } from '../key/configKey.js'
-import ClassServices from '../services/ClassServices.js'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
+import { useClassStore } from '../stores/classStore'
+import { useTeacherStore } from '../stores/teacherStore'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -81,14 +80,11 @@ const props = defineProps({
   classData: Object,
 })
 
-const emit = defineEmits(['update:modelValue', 'classUpdated'])
-
 const isOpen = ref(props.modelValue)
 watch(
   () => props.modelValue,
   (val) => (isOpen.value = val),
 )
-watch(isOpen, (val) => emit('update:modelValue', val))
 
 const form = ref({
   classDays: [],
@@ -134,20 +130,18 @@ const classTypes = [
   { label: 'Online', value: 'Online' },
 ]
 
+const classStore = useClassStore()
+const teacherStore = useTeacherStore()
 const teacherOptions = ref([])
 
 const fetchTeachers = async () => {
-  const snapshot = await getDocs(collection(db, 'users'))
-  teacherOptions.value = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    name: doc.data().name,
-  }))
+  await teacherStore.fetchTeachers()
+  teacherOptions.value = teacherStore.teachers.map((t) => ({ id: t.id, name: t.name }))
 }
 
 async function updateClass() {
   try {
-    await ClassServices.updateClassData(props.classId, form.value)
-    emit('classUpdated') // refresh data in parent
+    await classStore.updateClass(props.classId, form.value)
     isOpen.value = false
   } catch (err) {
     console.error('Failed to update class:', err.message)
@@ -156,7 +150,6 @@ async function updateClass() {
 
 async function deleteClass() {
   try {
-    // Show confirmation dialog before deleting
     $q.dialog({
       title: 'Confirmar Exclusão',
       message: 'Tem certeza que deseja excluir esta turma?',
@@ -165,12 +158,12 @@ async function deleteClass() {
     })
       .onOk(async () => {
         isOpen.value = false
-        ClassServices.deleteClass(props.classId)
+        await classStore.deleteClass(props.classId)
         $q.notify({
           type: 'positive',
           message: 'Turma excluída com sucesso!',
         })
-        router.push({ name: 'classList' }) // Redirect to class list
+        router.push({ name: 'classList' })
       })
       .onCancel(() => {
         console.log('Exclusão cancelada')
