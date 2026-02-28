@@ -147,7 +147,7 @@ export function useStudentDetails(initialId = null) {
     // prefetch the classes so that the select/options can be built
     await classStore.fetchClasses()
     classOptions.value = classStore.classes.map((cls) => ({
-      label: cls.name || 'Unnamed Class',
+      label: cls.className || 'Turma sem nome',
       value: cls.id,
     }))
 
