@@ -1,6 +1,7 @@
 import { getDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { db } from 'src/key/configKey.js'
 import { findNextClassDate, formatLocalDateKey } from 'src/utils/dateHelpers.js'
+import { fetchStudentById } from './students.fetch'
 
 export async function unscheduleStudent(classId, studentId) {
   const classRef = doc(db, 'classes', classId)
@@ -8,7 +9,7 @@ export async function unscheduleStudent(classId, studentId) {
   const studentRef = doc(db, 'students', studentId)
 
   // load the student and make sure we have an up‑to‑date absence count
-  const studentData = await this.etchStudentById(studentId)
+  const studentData = await fetchStudentById(studentId)
 
   if (!classSnap.exists()) {
     return { success: false, reason: 'Class not found' }
