@@ -6,10 +6,7 @@
       <StudentDetailsDialog v-model="isDetailsOpen" :student-id="detailStudentId" />
 
       <q-card-section>
-        <div>
-          <div class="text-h4 text-center">{{ classData.className }}</div>
-        </div>
-
+        <div class="text-h4 text-center">{{ classData.className }}</div>
         <div class="text-h5">
           Detalhes da Turma <q-btn icon="edit" @click="editDialog = true" />
         </div>
@@ -202,13 +199,7 @@
       </q-card>
     </q-dialog>
 
-    <UpdateClassDialog
-      v-model="editDialog"
-      :class-id="classId"
-      :class-data="classData"
-      @classUpdated="fetchClassDetails"
-      @classDeleted="fetchClassDetails"
-    />
+    <UpdateClassDialog v-model="editDialog" :class-id="classId" :class-data="classData" />
   </q-page>
 </template>
 
@@ -216,14 +207,16 @@
 import { ref, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore'
-import { db } from 'src/key/configKey.js'
 import StudentDetailsDialog from 'src/components/admin-students/students/StudentDetailsDialog.vue'
 import dayjs from 'dayjs'
 import ClassServices from 'src/services/ClassServices.js'
 import { unscheduleStudent, addReplenishmentStudent } from 'src/services/students/index.js'
 import { getNextClassDayKey } from 'src/utils/dateHelpers.js'
 import UpdateClassDialog from 'src/components/UpdateClassDialog.vue'
+import { useClassStore } from 'src/stores/classStore'
+import { useTeacherStore } from 'src/stores/teacherStore'
+import { useStudentStore } from 'src/stores/studentStore'
+import { storeToRefs } from 'pinia'
 
 // helper for day names
 const dayNamesMap = {
@@ -256,28 +249,64 @@ const route = useRoute()
 const $q = useQuasar()
 const classId = route.params.classId
 
+const classStore = useClassStore()
+const teacherStore = useTeacherStore()
+const studentStore = useStudentStore()
+const { students: studentList } = storeToRefs(studentStore)
+const classData = computed(() => classStore.classes.find((c) => c.id === classId) || null)
+const teacherName = computed(() =>
+  classData.value ? teacherStore.getTeacherNameById(classData.value.teacherId) : '',
+)
+
 const editDialog = ref(false)
 const isAddDialogOpen = ref(false)
 const isAddReplenishmentDialogOpen = ref(false)
-const classData = ref(null)
-const students = ref([])
-const teacherName = ref('')
 const selectedStudentId = ref(null)
 // details dialog state
 const detailStudentId = ref(null)
 const isDetailsOpen = ref(false)
 const availableStudents = ref([]) // { label: 'Name', value: 'id' }
-const classInfo = ref(null)
 const filteredStudents = ref([])
 
-/*
-function formatDate(timestamp) {
-  if (!timestamp) return ''
-  if (timestamp.toDate) {
-    return dayjs(timestamp.toDate()).format('DD/MM/YYYY')
-  }
-}
-*/
+const mainStudentIds = computed(() =>
+  Array.isArray(classData.value?.studentIds) ? classData.value.studentIds : [],
+)
+const unscheduledIds = computed(() =>
+  classData.value ? ClassServices.getUnscheduledForNextClass(classData.value) : [],
+)
+const replenishmentIds = computed(() =>
+  classData.value ? ClassServices.getReplenishmentsForNextClass(classData.value) : [],
+)
+
+const allStudentIds = computed(() =>
+  Array.from(
+    new Set([...mainStudentIds.value, ...unscheduledIds.value, ...replenishmentIds.value]),
+  ),
+)
+
+const students = computed(() => {
+  const byId = new Map(
+    studentList.value.map((student) => {
+      const sid = String(student.id || student.uid)
+      return [sid, student]
+    }),
+  )
+
+  return allStudentIds.value
+    .map((id) => {
+      const sid = String(id)
+      const found = byId.get(sid)
+      if (!found) return null
+
+      return {
+        ...found,
+        id: found.id || found.uid || sid,
+        isUnscheduled: unscheduledIds.value.includes(sid),
+        isReplenishment: replenishmentIds.value.includes(sid),
+      }
+    })
+    .filter((student) => student !== null)
+})
 
 function openAddStudentDialog() {
   fetchAvailableStudents()
@@ -294,6 +323,33 @@ function openAddReplenishmentStudentDialog() {
 function openStudentDialog(studentId) {
   detailStudentId.value = studentId
   isDetailsOpen.value = true
+}
+
+function syncClassDateList(fieldName, studentId, dateKey, isAddRecord) {
+  if (!classData.value || !dateKey) return
+
+  const source = classData.value[fieldName] || {}
+  const nextByDate = { ...source }
+  const currentList = Array.isArray(nextByDate[dateKey]) ? [...nextByDate[dateKey]] : []
+  const sid = String(studentId)
+
+  if (isAddRecord) {
+    if (!currentList.includes(sid)) currentList.push(sid)
+  } else {
+    const idx = currentList.indexOf(sid)
+    if (idx !== -1) currentList.splice(idx, 1)
+  }
+
+  if (currentList.length) {
+    nextByDate[dateKey] = currentList
+  } else {
+    delete nextByDate[dateKey]
+  }
+
+  classStore.updateClassInStore({
+    id: classId,
+    [fieldName]: nextByDate,
+  })
 }
 /*
 async function removeStudentFromClass(classId, studentId) {
@@ -327,10 +383,10 @@ const addStudentToClass = async () => {
 
   try {
     await ClassServices.addStudentToClassAdmin(classId, selectedStudentId.value)
+    classStore.syncStudentClassMembership(selectedStudentId.value, [], [classId])
     isAddDialogOpen.value = false
     selectedStudentId.value = null
-    await fetchAvailableStudents()
-    await fetchClassDetails()
+    fetchAvailableStudents()
   } catch (err) {
     console.error('Erro ao adicionar aluno à turma:', err)
   }
@@ -343,10 +399,9 @@ const addUnscheduledStudentToClass = async (classId, studentId) => {
     return $q.notify({ type: 'negative', message: 'Erro ao desmarcar aluno' })
   }
 
-  const date = dayjs(result.date).format('DD/MM/YYYY')
-  const s = students.value.find((x) => x.id === studentId)
+  syncClassDateList('unscheduledStudents', studentId, result.date, result.isAddRecord)
 
-  if (s) s.isUnscheduled = result.isAddRecord
+  const date = dayjs(result.date).format('DD/MM/YYYY')
 
   $q.notify({
     type: 'positive',
@@ -363,9 +418,9 @@ const addReplenishmentStudentToClass = async (classId, studentId) => {
     return $q.notify({ type: 'negative', message: 'Erro ao atualizar reposição' })
   }
 
-  const date = dayjs(result.date).format('DD/MM/YYYY')
+  syncClassDateList('replenishmentStudents', studentId, result.date, result.isAddRecord)
 
-  await fetchStudents()
+  const date = dayjs(result.date).format('DD/MM/YYYY')
 
   $q.notify({
     type: 'positive',
@@ -376,96 +431,34 @@ const addReplenishmentStudentToClass = async (classId, studentId) => {
   isAddReplenishmentDialogOpen.value = false
 }
 
-async function fetchClassDetails() {
-  const classRef = doc(db, 'classes', classId)
-  const classSnap = await getDoc(classRef)
-
-  if (classSnap.exists()) {
-    classData.value = classSnap.data()
-    await fetchTeacherName(classData.value.teacherId)
-    await fetchStudents(classData.value.studentIds || [])
-  } else {
-    console.error('Turma não encontrada')
-  }
-}
-
-async function fetchTeacherName(teacherId) {
+function fetchAvailableStudents() {
   try {
-    console.log('Buscando professor com ID:', teacherId)
+    const filtered = studentList.value.filter((student) => {
+      const ids = Array.isArray(student.classIds)
+        ? student.classIds
+        : student.classId
+          ? [student.classId]
+          : []
 
-    const teacherRef = doc(db, 'users', teacherId)
-    const teacherSnap = await getDoc(teacherRef)
-    if (teacherSnap.exists()) {
-      teacherName.value = teacherSnap.data().name
-    }
-  } catch (error) {
-    console.error('Erro ao buscar professor:', error)
-  }
-}
-
-async function fetchStudents() {
-  // 1️⃣ Fetch class info
-  const classSnap = await getDoc(doc(db, 'classes', classId))
-  if (!classSnap.exists()) return
-  classInfo.value = classSnap.data()
-
-  // 2️⃣ Get next class date key
-  const nextClassDay = getNextClassDayKey(classInfo.value)
-  if (!nextClassDay) {
-    console.warn('Could not determine next class day.')
-    return
-  }
-
-  // 3️⃣ Gather all student IDs (main, unscheduled, replenishments)
-  const mainIds = classInfo.value.studentIds || []
-  const unscheduledIds = ClassServices.getUnscheduledForNextClass(classInfo.value)
-  const replenishmentIds = ClassServices.getReplenishmentsForNextClass(classInfo.value)
-
-  // Combine all unique IDs
-  const allIds = Array.from(new Set([...mainIds, ...unscheduledIds, ...replenishmentIds]))
-
-  // 4️⃣ Fetch student documents
-  const promises = allIds.map(async (id) => {
-    const studentRef = doc(db, 'students', id)
-    const studentSnap = await getDoc(studentRef)
-    if (!studentSnap.exists()) return null
-
-    const studentData = { id, ...studentSnap.data() }
-
-    // 5️⃣ Annotate with flags
-    studentData.isUnscheduled = unscheduledIds.includes(id)
-    studentData.isReplenishment = replenishmentIds.includes(id)
-
-    return studentData
-  })
-
-  const results = await Promise.all(promises)
-
-  // 6️⃣ Filter valid and update state
-  students.value = results.filter((s) => s !== null)
-}
-const fetchAvailableStudents = async () => {
-  try {
-    const snapshot = await getDocs(collection(db, 'students'))
-
-    const allStudents = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }))
-
-    const filtered = allStudents.filter((student) => !student.classId)
+      return ids.length === 0
+    })
 
     availableStudents.value = filtered.map((student) => ({
       label: student.name,
-      value: student.id,
+      value: student.id || student.uid,
     }))
   } catch (error) {
-    console.error('Failed to fetch available students:', error)
+    console.error('Failed to prepare available students:', error)
   }
 }
 
-onMounted(() => {
-  fetchClassDetails()
+onMounted(async () => {
+  await Promise.all([
+    classStore.fetchClasses(),
+    teacherStore.fetchTeachers(),
+    studentStore.fetchStudents(),
+  ])
+  fetchAvailableStudents()
 })
 
 function filterStudents(val, update) {
