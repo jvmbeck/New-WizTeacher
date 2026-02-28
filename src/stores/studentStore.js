@@ -6,6 +6,7 @@ import {
   updateStudent,
   deleteStudent,
 } from 'src/services/students/index'
+import { useClassStore } from './classStore'
 
 export const useStudentStore = defineStore('studentStore', {
   state: () => ({
@@ -40,6 +41,15 @@ export const useStudentStore = defineStore('studentStore', {
       const existingIndex = this.students.findIndex((s) => s.id === id || s.uid === id)
       const existingStudent = existingIndex !== -1 ? { ...this.students[existingIndex] } : null
       const oldClassIds = existingStudent?.classIds ? [...existingStudent.classIds] : []
+      const classStore = useClassStore()
+
+      const normalizeIds = (ids) =>
+        (Array.isArray(ids) ? ids : [])
+          .map((item) =>
+            item && typeof item === 'object' ? (item.value ?? item.id ?? item) : item,
+          )
+          .filter((item) => item !== null && item !== undefined)
+          .map((item) => String(item))
 
       // Call service to update remote
       const updatedFromServer = await updateStudent(id, updatedData, oldClassIds)
@@ -55,6 +65,12 @@ export const useStudentStore = defineStore('studentStore', {
           })
         }
       }
+
+      const normalizedOldClassIds = normalizeIds(oldClassIds)
+      const normalizedNewClassIds = normalizeIds(
+        updatedFromServer?.classIds ?? updatedData?.classIds,
+      )
+      classStore.syncStudentClassMembership(id, normalizedOldClassIds, normalizedNewClassIds)
     },
     async deleteStudent(id, classId) {
       const res = await deleteStudent(id, classId)
