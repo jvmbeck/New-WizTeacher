@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    function isTeacherOrAdmin() {
+      return request.auth != null &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "teacher" ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
+    }
+
+    // Allow all authenticated users to read any document
+    match /{document=**} {
+      allow read: if request.auth != null;
+    }
+
+    // User documents - users can read their own, teachers/admins can write
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // Classes - only teachers/admins can write
+    match /classes/{classId} {
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // Student lessons - only teachers/admins can write
+    match /students/{studentId}/lessons/{lessonId} {
+      allow write: if isTeacherOrAdmin();
+    }
+    
+    // Students - only teachers/admins can write
+    match /students/{studentId} {
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // Completed lessons - only teachers/admins can write
+    match /lessonsCompleted/{docId} {
+      allow write: if isTeacherOrAdmin();
+    }
+    
+    // Absences - only teachers/admins can write
+    match /absences/{docId} {
+      allow write: if isTeacherOrAdmin();
+    }
+    
+    // Replenishments - only teachers/admins can write
+    match /replenishments/{docId} {
+      allow write: if isTeacherOrAdmin();
+    }
+  }
+}
