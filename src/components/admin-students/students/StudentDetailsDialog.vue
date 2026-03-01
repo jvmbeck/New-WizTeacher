@@ -125,6 +125,44 @@
 
       <q-separator />
 
+      <!-- replenishments list -->
+      <q-card-section>
+        <div class="text-h5" style="display: inline-block">
+          Reposições: {{ student?.pendingReplenishments ?? 0 }}
+        </div>
+        <q-btn
+          dense
+          flat
+          size="sm"
+          :label="showReplenishments ? 'Ocultar' : 'Mostrar'"
+          :icon="showReplenishments ? 'visibility_off' : 'visibility'"
+          @click="showReplenishments = !showReplenishments"
+          class="q-ml-sm"
+        />
+
+        <q-spinner v-if="loadingReplenishments && showReplenishments" />
+        <q-list v-else-if="showReplenishments">
+          <q-item v-for="replenishment in replenishments" :key="replenishment.id">
+            <q-item-section>
+              <q-item-label>{{
+                dayjs(replenishment.replenishmentDate).format('DD/MM/YYYY')
+              }}</q-item-label>
+              <q-item-label caption>
+                Turma: {{ classStore.getClassNameById(replenishment.replenishmentClassId) }}
+              </q-item-label>
+              <q-item-label caption v-if="replenishment.notes">
+                Notas: {{ replenishment.notes }}
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-item v-if="!loadingReplenishments && replenishments.length === 0">
+            <q-item-section>Nenhuma reposição registrada.</q-item-section>
+          </q-item>
+        </q-list>
+      </q-card-section>
+
+      <q-separator />
+
       <!-- lessons table -->
       <q-card-section>
         <q-table
@@ -147,9 +185,11 @@
 
 <script setup>
 import { computed, watch, ref, onMounted, onUnmounted } from 'vue'
+import dayjs from 'dayjs'
 import bookStructure from 'src/data/bookStructure.json'
 import { useClassStore } from 'src/stores/classStore'
 import { useStudentDetails } from 'src/composables/useStudentDetails'
+import { getPendingReplenishments } from 'src/services/students/index.js'
 
 const props = defineProps({
   studentId: String,
@@ -205,6 +245,7 @@ watch(
   () => props.studentId,
   (id) => {
     sid.value = id
+    showReplenishments.value = false
   },
 )
 
@@ -218,6 +259,32 @@ watch(opened, (val) => {
 watch(showAbsences, (val) => {
   if (val && props.studentId) {
     loadAbsences(props.studentId)
+  }
+})
+
+// replenishments state and logic
+const showReplenishments = ref(false)
+const replenishments = ref([])
+const loadingReplenishments = ref(false)
+
+async function loadReplenishments(studentId) {
+  if (!studentId) return
+  loadingReplenishments.value = true
+  try {
+    const data = await getPendingReplenishments(studentId)
+    replenishments.value = data || []
+  } catch (error) {
+    console.error('Error loading replenishments:', error)
+    replenishments.value = []
+  } finally {
+    loadingReplenishments.value = false
+  }
+}
+
+// fetch replenishments only when the user requests them
+watch(showReplenishments, (val) => {
+  if (val && props.studentId) {
+    loadReplenishments(props.studentId)
   }
 })
 
