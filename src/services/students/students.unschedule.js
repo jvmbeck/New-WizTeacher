@@ -3,87 +3,128 @@ import { db } from 'src/key/configKey.js'
 import { findNextClassDate, formatLocalDateKey } from 'src/utils/dateHelpers.js'
 import { fetchStudentById } from './students.fetch'
 
-export async function unscheduleStudent(classId, studentId) {
+export async function unscheduleStudent(classId, studentId, selectedDates = []) {
   const classRef = doc(db, 'classes', classId)
   const classSnap = await getDoc(classRef)
-  const studentRef = doc(db, 'students', studentId)
+  const sid = String(studentId)
+  const studentRef = doc(db, 'students', sid)
 
   // load the student and make sure we have an up‑to‑date absence count
-  const studentData = await fetchStudentById(studentId)
+  const studentData = await fetchStudentById(sid)
 
   if (!classSnap.exists()) {
     return { success: false, reason: 'Class not found' }
   }
 
   const classData = classSnap.data()
-  const classDays = classData.classDays || []
   const existingUnschedules = classData.unscheduledStudents || {} // keep field name consistent with your DB
 
-  const today = new Date()
-  const nextClassDate = findNextClassDate(today, classDays)
+  // Normalize input dates
+  const normalizedInputDates = Array.isArray(selectedDates)
+    ? Array.from(new Set(selectedDates.map((dateKey) => String(dateKey).trim()).filter(Boolean)))
+    : []
 
-  if (!nextClassDate) {
-    return { success: false, reason: 'Could not determine next class date' }
+  let targetDateKeys = normalizedInputDates
+
+  // Only use next class date as default if selectedDates was not explicitly passed (undefined/null)
+  // An empty array means "clear all unscheduled dates"
+  if (selectedDates === undefined || selectedDates === null) {
+    const classDays = classData.classDays || []
+    const today = new Date()
+    const nextClassDate = findNextClassDate(today, classDays)
+
+    if (!nextClassDate) {
+      return { success: false, reason: 'Could not determine next class date' }
+    }
+
+    targetDateKeys = [formatLocalDateKey(nextClassDate)]
   }
 
-  const dateKey = formatLocalDateKey(nextClassDate)
+  targetDateKeys.sort((a, b) => a.localeCompare(b))
+
+  const existingDateKeysForStudent = Object.entries(existingUnschedules)
+    .filter(([, ids]) => Array.isArray(ids) && ids.map((id) => String(id)).includes(sid))
+    .map(([dateKey]) => dateKey)
+    .sort((a, b) => a.localeCompare(b))
+
   const updatedUnschedules = { ...existingUnschedules }
+  const targetSet = new Set(targetDateKeys)
+  const existingSet = new Set(existingDateKeysForStudent)
 
-  if (!Array.isArray(updatedUnschedules[dateKey])) {
-    updatedUnschedules[dateKey] = []
+  const addedDates = targetDateKeys.filter((dateKey) => !existingSet.has(dateKey))
+  const removedDates = existingDateKeysForStudent.filter((dateKey) => !targetSet.has(dateKey))
+  const unchangedDates = targetDateKeys.filter((dateKey) => existingSet.has(dateKey))
+
+  if (addedDates.length === 0 && removedDates.length === 0) {
+    return {
+      success: true,
+      addedDates,
+      removedDates,
+      unchangedDates,
+      absencesDelta: 0,
+    }
   }
 
-  const batch = writeBatch(db)
+  addedDates.forEach((dateKey) => {
+    if (!Array.isArray(updatedUnschedules[dateKey])) {
+      updatedUnschedules[dateKey] = []
+    }
 
-  const index = updatedUnschedules[dateKey].indexOf(studentId)
+    if (!updatedUnschedules[dateKey].includes(sid)) {
+      updatedUnschedules[dateKey].push(sid)
+    }
+  })
 
-  const globalAbsencesRef = doc(db, 'absences', `${studentId}_${classId}_${dateKey}`)
+  removedDates.forEach((dateKey) => {
+    if (!Array.isArray(updatedUnschedules[dateKey])) return
 
-  let isAddRecord = false
+    updatedUnschedules[dateKey] = updatedUnschedules[dateKey].filter((id) => String(id) !== sid)
 
-  if (index !== -1) {
-    // 🔄 Student already unscheduled — remove them (toggle off)
-    updatedUnschedules[dateKey].splice(index, 1)
-
-    // If the array becomes empty, you can also optionally delete the key:
     if (updatedUnschedules[dateKey].length === 0) {
       delete updatedUnschedules[dateKey]
     }
-    batch.update(classRef, {
-      unscheduledStudents: updatedUnschedules,
-    })
-    batch.update(studentRef, {
-      // studentData comes from fetchStudentById and exposes `totalAbsences`.
-      // fall back to 0 just in case something is missing, but we should
-      // never see the wrong value here.
-      totalAbsences: (studentData?.totalAbsences || 0) - 1,
-    })
-    batch.delete(globalAbsencesRef)
-  } else {
-    // ➕ Student not unscheduled yet — add them
-    updatedUnschedules[dateKey].push(studentId)
-    batch.update(classRef, {
-      unscheduledStudents: updatedUnschedules,
-    })
-    batch.update(studentRef, {
-      totalAbsences: (studentData?.totalAbsences || 0) + 1,
-    })
+  })
+
+  const batch = writeBatch(db)
+
+  const totalAbsencesDelta = addedDates.length - removedDates.length
+  const updatedTotalAbsences = Math.max(0, (studentData?.totalAbsences || 0) + totalAbsencesDelta)
+
+  batch.update(classRef, {
+    unscheduledStudents: updatedUnschedules,
+  })
+  batch.update(studentRef, {
+    totalAbsences: updatedTotalAbsences,
+  })
+
+  addedDates.forEach((dateKey) => {
+    const globalAbsencesRef = doc(db, 'absences', `${sid}_${classId}_${dateKey}`)
     batch.set(globalAbsencesRef, {
-      studentId,
+      studentId: sid,
       classId,
       date: dateKey,
       recordedAt: serverTimestamp(),
       type: 'unschedule',
       reason: 'Aula desmarcada',
     })
-    isAddRecord = true
-  }
+  })
+
+  removedDates.forEach((dateKey) => {
+    const globalAbsencesRef = doc(db, 'absences', `${sid}_${classId}_${dateKey}`)
+    batch.delete(globalAbsencesRef)
+  })
 
   try {
     await batch.commit()
-    return { success: true, date: dateKey, isAddRecord: isAddRecord }
+    return {
+      success: true,
+      addedDates,
+      removedDates,
+      unchangedDates,
+      absencesDelta: totalAbsencesDelta,
+    }
   } catch (error) {
     console.warn(error)
-    return { success: false, dateKey }
+    return { success: false, reason: 'Failed to save unschedules' }
   }
 }
