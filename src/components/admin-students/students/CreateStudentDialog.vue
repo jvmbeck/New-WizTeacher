@@ -30,7 +30,7 @@
           <q-select
             v-model="selectedClassIds"
             :options="classes"
-            option-label="name"
+            option-label="className"
             option-value="id"
             emit-value
             map-options
