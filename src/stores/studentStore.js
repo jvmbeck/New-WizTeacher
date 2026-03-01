@@ -16,7 +16,7 @@ export const useStudentStore = defineStore('studentStore', {
   actions: {
     async fetchStudents(force = false) {
       if (this.loaded && !force) {
-        console.log('STUDENTS STORE: \nUSING STUDENTS ARRAY BECAUSE ITS ALREADY BEEN FETCHED')
+        console.log('STUDENTS STORE: \n\nStudent array already exists. Returning array. ')
         console.log(this.students)
 
         return this.students
@@ -25,7 +25,7 @@ export const useStudentStore = defineStore('studentStore', {
     },
     async refreshStudentsArray() {
       this.students = await fetchAllStudents()
-      console.log('STUDENTS STORE: \nFETCHING NEW STUDENT ARRAY')
+      console.log("STUDENTS STORE: \n\nStudent array doesn't exist. Fetching data first.")
 
       this.loaded = true
       return this.students

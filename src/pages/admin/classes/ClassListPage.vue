@@ -18,6 +18,7 @@
         </template>
       </q-input>
       <q-btn label="Criar Turma" @click="openCreateClassDialog" />
+      <q-btn @click="RefreshList" icon="refresh" />
     </div>
 
     <q-card>
@@ -96,6 +97,10 @@ const filteredClassList = computed(() => {
 async function fetchClassList() {
   await classStore.fetchClasses()
   await teacherStore.fetchTeachers()
+}
+
+const RefreshList = async () => {
+  await classStore.refreshClassesArray()
 }
 
 const columns = [
