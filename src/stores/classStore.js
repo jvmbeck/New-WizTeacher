@@ -41,10 +41,8 @@ export const useClassStore = defineStore('classStore', {
         console.log('CLASS STORE: \n\nClass array already exists. Returning array.')
         return this.classes
       }
-      const classes = await ClassServices.fetchAllClasses()
-      this.classes = classes
-      console.log("CLASS STORE: \n\nClass array doesn't exist. Fetching data first.")
 
+      this.refreshClassesArray()
       return this.classes
     },
     async createClass(classData) {
@@ -53,7 +51,12 @@ export const useClassStore = defineStore('classStore', {
       this.addClassToStore(newClass)
       return newClass
     },
+    async refreshClassesArray() {
+      this.classes = await ClassServices.fetchAllClasses()
+      console.log('CLASS STORE: \n\nFetching new class data from firestore.')
 
+      return this.classes
+    },
     // Helper functions
     updateClassInStore(updatedClass) {
       console.log('CLASS STORE: \n\nUpdating class data in class array')
