@@ -79,6 +79,7 @@
             option-label="label"
             option-value="value"
             emit-value
+            map-options
             multiple
           />
           <div class="row q-gutter-sm q-pt-md">
