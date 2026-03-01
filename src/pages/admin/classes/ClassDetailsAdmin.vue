@@ -39,7 +39,7 @@
         class="q-mb-md"
       />
       <q-btn
-        label="Adicionar aluno de reposição à turma"
+        label="Gerenciar reposições"
         color="primary"
         @click="openAddReplenishmentStudentDialog()"
         class="q-mb-md"
@@ -77,23 +77,23 @@
 
                 <q-btn
                   v-if="!student.isReplenishment"
-                  label="Desmarcar próxima aula"
+                  label="Desmarcar aulas"
                   flat
                   color="negative"
                   icon="event_busy"
-                  @click="addUnscheduledStudentToClass(classId, student.id)"
+                  @click="openUnscheduleDialog(student)"
                 >
-                  <q-tooltip>Desmarcar próxima aula</q-tooltip>
+                  <q-tooltip>Selecionar datas para desmarcar</q-tooltip>
                 </q-btn>
                 <q-btn
                   v-if="student.isReplenishment"
-                  label="Remover reposição"
+                  label="Editar reposição"
                   flat
-                  color="negative"
-                  icon="event_busy"
-                  @click="addReplenishmentStudentToClass(classId, student.id)"
+                  color="primary"
+                  icon="event"
+                  @click="openAddReplenishmentStudentDialog(student.id)"
                 >
-                  <q-tooltip>Desmarcar próxima aula</q-tooltip>
+                  <q-tooltip>Editar datas de reposição</q-tooltip>
                 </q-btn>
               </div>
             </q-item-section>
@@ -110,12 +110,12 @@
     <q-dialog v-model="isAddDialogOpen">
       <q-card style="min-width: 500px">
         <q-card-section class="row items-center">
-          <div class="text-h6">Selecionar Aluno</div>
+          <div class="text-h6">Selecione o aluno que deseja adicionar</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
 
-        <q-card-section>
+        <q-card-section class="q-gutter-md">
           <q-select
             v-model="selectedStudentId"
             :options="filteredStudents"
@@ -177,6 +177,7 @@
             fill-input
             input-debounce="0"
             @filter="filterStudents"
+            @update:model-value="onReplenishmentStudentChange"
           >
             <template v-slot:no-option>
               <q-item>
@@ -184,20 +185,37 @@
               </q-item>
             </template>
           </q-select>
+
+          <q-date v-model="selectedReplenishmentDates" multiple mask="YYYY-MM-DD" minimal />
+
+          <div class="text-caption text-grey-7">
+            Selecione uma ou mais datas de reposição para o aluno escolhido.
+          </div>
         </q-card-section>
 
         <q-card-actions align="right" class="q-pa-md">
           <q-btn flat label="Cancelar" v-close-popup />
           <q-btn
             flat
-            label="Adicionar"
+            label="Salvar"
             color="primary"
             :disable="!selectedStudentId"
-            @click="addReplenishmentStudentToClass(classId, selectedStudentId)"
+            @click="saveReplenishmentSelection"
           />
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <UnscheduleStudentDialog
+      ref="unscheduleDialogRef"
+      :class-id="classId"
+      @needs-replenishment="handleNeedsReplenishment"
+    />
+
+    <ScheduleReplenishmentDialog
+      ref="replenishmentDialogRef"
+      :available-classes="classStore.classes"
+    />
 
     <UpdateClassDialog v-model="editDialog" :class-id="classId" :class-data="classData" />
   </q-page>
@@ -210,9 +228,11 @@ import { useRoute } from 'vue-router'
 import StudentDetailsDialog from 'src/components/admin-students/students/StudentDetailsDialog.vue'
 import dayjs from 'dayjs'
 import ClassServices from 'src/services/ClassServices.js'
-import { unscheduleStudent, addReplenishmentStudent } from 'src/services/students/index.js'
+import { setReplenishmentDatesForStudent } from 'src/services/students/index.js'
 import { getNextClassDayKey } from 'src/utils/dateHelpers.js'
 import UpdateClassDialog from 'src/components/UpdateClassDialog.vue'
+import UnscheduleStudentDialog from 'src/components/UnscheduleStudentDialog.vue'
+import ScheduleReplenishmentDialog from 'src/components/ScheduleReplenishmentDialog.vue'
 import { useClassStore } from 'src/stores/classStore'
 import { useTeacherStore } from 'src/stores/teacherStore'
 import { useStudentStore } from 'src/stores/studentStore'
@@ -262,9 +282,12 @@ const editDialog = ref(false)
 const isAddDialogOpen = ref(false)
 const isAddReplenishmentDialogOpen = ref(false)
 const selectedStudentId = ref(null)
+const selectedReplenishmentDates = ref([])
 // details dialog state
 const detailStudentId = ref(null)
 const isDetailsOpen = ref(false)
+const unscheduleDialogRef = ref(null)
+const replenishmentDialogRef = ref(null)
 const availableStudents = ref([]) // { label: 'Name', value: 'id' }
 const filteredStudents = ref([])
 
@@ -309,15 +332,57 @@ const students = computed(() => {
 })
 
 function openAddStudentDialog() {
-  fetchAvailableStudents()
+  fetchAvailableStudents('addClass')
+  filteredStudents.value = availableStudents.value
   isAddDialogOpen.value = true
   selectedStudentId.value = null
 }
 
-function openAddReplenishmentStudentDialog() {
-  fetchAvailableStudents()
+function openAddReplenishmentStudentDialog(studentId = null) {
+  fetchAvailableStudents('replenishment')
+
+  if (studentId) {
+    const sid = String(studentId)
+    const selectedStudent = studentList.value.find(
+      (student) => String(student.id || student.uid) === sid,
+    )
+
+    if (selectedStudent) {
+      const option = {
+        label: selectedStudent.name,
+        value: selectedStudent.id || selectedStudent.uid,
+      }
+
+      const hasOption = availableStudents.value.some((entry) => String(entry.value) === sid)
+      if (!hasOption) {
+        availableStudents.value = [option, ...availableStudents.value]
+      }
+    }
+
+    selectedStudentId.value = sid
+    selectedReplenishmentDates.value = getReplenishmentDatesForStudent(sid)
+  } else {
+    selectedStudentId.value = null
+    selectedReplenishmentDates.value = []
+  }
+
+  filteredStudents.value = availableStudents.value
   isAddReplenishmentDialogOpen.value = true
-  selectedStudentId.value = null
+}
+
+function openUnscheduleDialog(student) {
+  unscheduleDialogRef.value?.open(student)
+}
+
+function handleNeedsReplenishment(data) {
+  $q.dialog({
+    title: 'Agendar Reposição',
+    message: `${data.studentName} faltará ${data.missedDates.length} aula(s). Deseja agendar reposição agora?`,
+    cancel: { label: 'Depois', color: 'grey' },
+    ok: { label: 'Sim, agendar', color: 'primary' },
+  }).onOk(() => {
+    replenishmentDialogRef.value?.open(data)
+  })
 }
 
 function openStudentDialog(studentId) {
@@ -350,6 +415,27 @@ function syncClassDateList(fieldName, studentId, dateKey, isAddRecord) {
     id: classId,
     [fieldName]: nextByDate,
   })
+}
+
+function getReplenishmentDatesForStudent(studentId) {
+  if (!classData.value) return []
+
+  const sid = String(studentId)
+  const byDate = classData.value.replenishmentStudents || {}
+
+  return Object.entries(byDate)
+    .filter(([, studentIds]) => Array.isArray(studentIds) && studentIds.map(String).includes(sid))
+    .map(([dateKey]) => dateKey)
+    .sort((a, b) => a.localeCompare(b))
+}
+
+function onReplenishmentStudentChange(studentId) {
+  if (!studentId) {
+    selectedReplenishmentDates.value = []
+    return
+  }
+
+  selectedReplenishmentDates.value = getReplenishmentDatesForStudent(studentId)
 }
 /*
 async function removeStudentFromClass(classId, studentId) {
@@ -392,61 +478,94 @@ const addStudentToClass = async () => {
   }
 }
 
-const addUnscheduledStudentToClass = async (classId, studentId) => {
-  const result = await unscheduleStudent(classId, studentId)
+const saveReplenishmentSelection = async () => {
+  if (!selectedStudentId.value) return
+
+  const datesToSave = Array.isArray(selectedReplenishmentDates.value)
+    ? selectedReplenishmentDates.value
+    : []
+
+  const result = await setReplenishmentDatesForStudent(
+    classId,
+    selectedStudentId.value,
+    datesToSave,
+  )
 
   if (!result.success) {
-    return $q.notify({ type: 'negative', message: 'Erro ao desmarcar aluno' })
+    return $q.notify({ type: 'negative', message: 'Erro ao salvar reposições' })
   }
 
-  syncClassDateList('unscheduledStudents', studentId, result.date, result.isAddRecord)
-
-  const date = dayjs(result.date).format('DD/MM/YYYY')
-
-  $q.notify({
-    type: 'positive',
-    message: result.isAddRecord
-      ? `Aluno desmarcado para data ${date}`
-      : `Desmarcação removida para data ${date}`,
+  result.addedDates.forEach((dateKey) => {
+    syncClassDateList('replenishmentStudents', selectedStudentId.value, dateKey, true)
   })
-}
 
-const addReplenishmentStudentToClass = async (classId, studentId) => {
-  const result = await addReplenishmentStudent(classId, studentId)
-
-  if (!result.success) {
-    return $q.notify({ type: 'negative', message: 'Erro ao atualizar reposição' })
-  }
-
-  syncClassDateList('replenishmentStudents', studentId, result.date, result.isAddRecord)
-
-  const date = dayjs(result.date).format('DD/MM/YYYY')
-
-  $q.notify({
-    type: 'positive',
-    message: result.isAddRecord
-      ? `Reposição marcada para data ${date}`
-      : `Reposição desmarcada para data ${date}`,
+  result.removedDates.forEach((dateKey) => {
+    syncClassDateList('replenishmentStudents', selectedStudentId.value, dateKey, false)
   })
-  isAddReplenishmentDialogOpen.value = false
-}
 
-function fetchAvailableStudents() {
-  try {
-    const filtered = studentList.value.filter((student) => {
-      const ids = Array.isArray(student.classIds)
-        ? student.classIds
-        : student.classId
-          ? [student.classId]
-          : []
-
-      return ids.length === 0
+  if (result.addedDates.length === 0 && result.removedDates.length === 0) {
+    isAddReplenishmentDialogOpen.value = false
+    selectedStudentId.value = null
+    selectedReplenishmentDates.value = []
+    return $q.notify({
+      type: 'info',
+      message: 'Nenhuma alteração nas reposições.',
     })
+  }
 
-    availableStudents.value = filtered.map((student) => ({
-      label: student.name,
-      value: student.id || student.uid,
-    }))
+  isAddReplenishmentDialogOpen.value = false
+  selectedStudentId.value = null
+  selectedReplenishmentDates.value = []
+
+  const addedCount = result.addedDates.length
+  const removedCount = result.removedDates.length
+
+  if (addedCount > 0 && removedCount > 0) {
+    return $q.notify({
+      type: 'positive',
+      message: `Reposições atualizadas: ${addedCount} adicionada(s) e ${removedCount} removida(s).`,
+    })
+  }
+
+  if (addedCount > 0) {
+    return $q.notify({
+      type: 'positive',
+      message:
+        addedCount === 1
+          ? '1 data de reposição adicionada.'
+          : `${addedCount} datas de reposição adicionadas.`,
+    })
+  }
+
+  return $q.notify({
+    type: 'positive',
+    message:
+      removedCount === 1
+        ? '1 data de reposição removida.'
+        : `${removedCount} datas de reposição removidas.`,
+  })
+}
+
+function fetchAvailableStudents(mode = 'addClass') {
+  try {
+    const currentClassIds = new Set(mainStudentIds.value.map((id) => String(id)))
+
+    const source =
+      mode === 'replenishment'
+        ? studentList.value
+        : studentList.value.filter((student) => {
+            const sid = String(student.id || student.uid)
+            return !currentClassIds.has(sid)
+          })
+
+    availableStudents.value = source
+      .map((student) => ({
+        label: student.name || student.studentName || 'Aluno sem nome',
+        value: student.id || student.uid,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+
+    filteredStudents.value = availableStudents.value
   } catch (error) {
     console.error('Failed to prepare available students:', error)
   }
@@ -458,7 +577,7 @@ onMounted(async () => {
     teacherStore.fetchTeachers(),
     studentStore.fetchStudents(),
   ])
-  fetchAvailableStudents()
+  fetchAvailableStudents('addClass')
 })
 
 function filterStudents(val, update) {
