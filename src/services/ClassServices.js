@@ -183,19 +183,30 @@ const ClassServices = {
     })
   },
 
-  getUnscheduledForNextClass(classInfo) {
-    const nextDateKey = getNextClassDayKey(classInfo)
+  getUnscheduledForNextClass(classInfo, classDate) {
+    console.log('ClassServices: \nclassDate = ', classDate)
+
+    const nextDateKey = classDate || getNextClassDayKey(classInfo)
     if (!nextDateKey) return []
 
     const unscheduled = classInfo.unscheduledStudents || {}
+    console.log('ClassServices: \nunscheduled for next class = ', unscheduled[nextDateKey] || [])
+    console.log('ClassServices: \nnextDateKey = ', nextDateKey)
     return unscheduled[nextDateKey] || []
   },
 
-  getReplenishmentsForNextClass(classInfo) {
-    const nextDateKey = getNextClassDayKey(classInfo)
+  getReplenishmentsForNextClass(classInfo, classDate) {
+    console.log('ClassServices: \nclassDate = ', classDate)
+
+    const nextDateKey = classDate || getNextClassDayKey(classInfo)
     if (!nextDateKey) return []
 
     const replenishments = classInfo.replenishmentStudents || {}
+    console.log(
+      'ClassServices: \nreplenishments for next class = ',
+      replenishments[nextDateKey] || [],
+    )
+    console.log('ClassServices: \nnextDateKey = ', nextDateKey)
     return replenishments[nextDateKey] || []
   },
 }
