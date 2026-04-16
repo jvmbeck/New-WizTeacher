@@ -7,6 +7,27 @@
 
       <q-card-section>
         <div class="text-h4 text-center">{{ classData.className }}</div>
+        <div class="q-mb-sm">
+          <q-badge label="Visualizando data: " v-if="proxyDate" class="q-mr-sm text-subtitle2">{{
+            proxyDate
+          }}</q-badge>
+          <q-btn icon="event" round color="primary">
+            <q-popup-proxy
+              @before-show="updateProxy"
+              cover
+              transition-show="scale"
+              transition-hide="scale"
+            >
+              <q-date v-model="proxyDate" mask="YYYY-MM-DD">
+                <div class="row items-center justify-end q-gutter-sm">
+                  <q-btn label="Cancel" color="primary" flat v-close-popup />
+                  <q-btn label="OK" color="primary" flat @click="save" v-close-popup />
+                </div>
+              </q-date>
+            </q-popup-proxy>
+          </q-btn>
+        </div>
+
         <div class="text-h5">
           Detalhes da Turma <q-btn icon="edit" @click="editDialog = true" />
         </div>
@@ -222,7 +243,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 import StudentDetailsDialog from 'src/components/admin-students/students/StudentDetailsDialog.vue'
@@ -249,6 +270,19 @@ const dayNamesMap = {
   6: 'Sábado',
 }
 
+const route = useRoute()
+const $q = useQuasar()
+const classId = route.params.classId
+
+const classStore = useClassStore()
+const teacherStore = useTeacherStore()
+const studentStore = useStudentStore()
+const { students: studentList } = storeToRefs(studentStore)
+const classData = computed(() => classStore.classes.find((c) => c.id === classId) || null)
+const teacherName = computed(() =>
+  classData.value ? teacherStore.getTeacherNameById(classData.value.teacherId) : '',
+)
+
 const nextClassDateKey = computed(() => {
   if (!classData.value) return null
   return getNextClassDayKey(classData.value)
@@ -264,19 +298,27 @@ const nextClassDateDay = computed(() => {
   if (!nextClassDateKey.value) return null
   return dayjs(nextClassDateKey.value).date()
 })
+const visualizedDate = ref(null)
 
-const route = useRoute()
-const $q = useQuasar()
-const classId = route.params.classId
-
-const classStore = useClassStore()
-const teacherStore = useTeacherStore()
-const studentStore = useStudentStore()
-const { students: studentList } = storeToRefs(studentStore)
-const classData = computed(() => classStore.classes.find((c) => c.id === classId) || null)
-const teacherName = computed(() =>
-  classData.value ? teacherStore.getTeacherNameById(classData.value.teacherId) : '',
+watch(
+  nextClassDateKey,
+  (newDateKey) => {
+    if (!visualizedDate.value) {
+      visualizedDate.value = newDateKey
+    }
+  },
+  { immediate: true },
 )
+
+const proxyDate = ref(visualizedDate.value)
+function updateProxy() {
+  proxyDate.value = visualizedDate.value
+}
+
+function save() {
+  visualizedDate.value = String(proxyDate.value || '').replaceAll('/', '-') || null
+  editDialog.value = false
+}
 
 const editDialog = ref(false)
 const isAddDialogOpen = ref(false)
@@ -295,10 +337,14 @@ const mainStudentIds = computed(() =>
   Array.isArray(classData.value?.studentIds) ? classData.value.studentIds : [],
 )
 const unscheduledIds = computed(() =>
-  classData.value ? ClassServices.getUnscheduledForNextClass(classData.value) : [],
+  classData.value
+    ? ClassServices.getUnscheduledForNextClass(classData.value, visualizedDate.value)
+    : [],
 )
 const replenishmentIds = computed(() =>
-  classData.value ? ClassServices.getReplenishmentsForNextClass(classData.value) : [],
+  classData.value
+    ? ClassServices.getReplenishmentsForNextClass(classData.value, visualizedDate.value)
+    : [],
 )
 
 const allStudentIds = computed(() =>
