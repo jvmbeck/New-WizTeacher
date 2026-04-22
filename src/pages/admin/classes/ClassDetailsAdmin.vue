@@ -67,63 +67,128 @@
       />
 
       <q-card-section>
-        <div class="text-subtitle1">Alunos</div>
-        <q-list bordered>
-          <q-item v-for="student in students" :key="student.id">
-            <q-item-section>
-              <q-item-label
-                >{{ student.name }}
-                <q-badge v-if="student.isReplenishment" color="orange" class="q-ml-sm">
-                  Reposição
-                </q-badge>
+        <div class="text-subtitle1 q-mb-sm">Alunos</div>
+        <q-tabs
+          v-model="studentsTab"
+          dense
+          align="left"
+          active-color="primary"
+          indicator-color="primary"
+        >
+          <q-tab name="students" :label="`Turma (${students.length})`" />
+          <q-tab name="waiting" :label="`Lista de espera (${waitingListStudents.length})`" />
+        </q-tabs>
 
-                <q-badge v-if="student.isUnscheduled" color="grey" class="q-ml-sm">
-                  Desmarcado
-                </q-badge></q-item-label
-              >
-              <q-item-label caption>ID: {{ student.id }}</q-item-label>
-            </q-item-section>
+        <q-separator class="q-my-sm" />
 
-            <q-item-section side>
-              <div class="row q-gutter-sm">
-                <q-btn
-                  label="Ver detalhes"
-                  flat
-                  color="primary"
-                  icon="visibility"
-                  @click="openStudentDialog(student.id)"
-                >
-                  <q-tooltip>Ver detalhes</q-tooltip>
-                </q-btn>
+        <q-tab-panels v-model="studentsTab" animated>
+          <q-tab-panel name="students" class="q-pa-none">
+            <q-list bordered>
+              <q-item v-for="student in students" :key="student.id">
+                <q-item-section>
+                  <q-item-label
+                    >{{ student.name }}
+                    <q-badge v-if="student.isReplenishment" color="orange" class="q-ml-sm">
+                      Reposição
+                    </q-badge>
 
-                <q-btn
-                  v-if="!student.isReplenishment"
-                  label="Desmarcar aulas"
-                  flat
-                  color="negative"
-                  icon="event_busy"
-                  @click="openUnscheduleDialog(student)"
-                >
-                  <q-tooltip>Selecionar datas para desmarcar</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="student.isReplenishment"
-                  label="Editar reposição"
-                  flat
-                  color="primary"
-                  icon="event"
-                  @click="openAddReplenishmentStudentDialog(student.id)"
-                >
-                  <q-tooltip>Editar datas de reposição</q-tooltip>
-                </q-btn>
-              </div>
-            </q-item-section>
-          </q-item>
+                    <q-badge v-if="student.isUnscheduled" color="grey" class="q-ml-sm">
+                      Desmarcado
+                    </q-badge></q-item-label
+                  >
+                  <q-item-label caption>ID: {{ student.id }}</q-item-label>
+                </q-item-section>
 
-          <q-item v-if="students.length === 0">
-            <q-item-section>Nenhum aluno encontrado.</q-item-section>
-          </q-item>
-        </q-list>
+                <q-item-section side>
+                  <div class="row q-gutter-sm">
+                    <q-btn
+                      label="Ver detalhes"
+                      flat
+                      color="primary"
+                      icon="visibility"
+                      @click="openStudentDialog(student.id)"
+                    >
+                      <q-tooltip>Ver detalhes</q-tooltip>
+                    </q-btn>
+
+                    <q-btn
+                      v-if="!student.isReplenishment"
+                      label="Desmarcar aulas"
+                      flat
+                      color="negative"
+                      icon="event_busy"
+                      @click="openUnscheduleDialog(student)"
+                    >
+                      <q-tooltip>Selecionar datas para desmarcar</q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="student.isReplenishment"
+                      label="Editar reposição"
+                      flat
+                      color="primary"
+                      icon="event"
+                      @click="openAddReplenishmentStudentDialog(student.id)"
+                    >
+                      <q-tooltip>Editar datas de reposição</q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="student.isMainStudent"
+                      label="Lista de espera"
+                      flat
+                      color="warning"
+                      icon="schedule"
+                      @click="moveStudentToWaitingList(student)"
+                    >
+                      <q-tooltip>Mover aluno para lista de espera</q-tooltip>
+                    </q-btn>
+                  </div>
+                </q-item-section>
+              </q-item>
+
+              <q-item v-if="students.length === 0">
+                <q-item-section>Nenhum aluno encontrado.</q-item-section>
+              </q-item>
+            </q-list>
+          </q-tab-panel>
+
+          <q-tab-panel name="waiting" class="q-pa-none">
+            <q-list bordered>
+              <q-item v-for="student in waitingListStudents" :key="`waiting-${student.id}`">
+                <q-item-section>
+                  <q-item-label>{{ student.name }}</q-item-label>
+                  <q-item-label caption>ID: {{ student.id }}</q-item-label>
+                </q-item-section>
+
+                <q-item-section side>
+                  <div class="row q-gutter-sm">
+                    <q-btn
+                      label="Ver detalhes"
+                      flat
+                      color="primary"
+                      icon="visibility"
+                      @click="openStudentDialog(student.id)"
+                    >
+                      <q-tooltip>Ver detalhes</q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      label="Restaurar para turma"
+                      flat
+                      color="positive"
+                      icon="person_add"
+                      @click="restoreStudentToClass(student)"
+                    >
+                      <q-tooltip>Remover da lista de espera e voltar para turma</q-tooltip>
+                    </q-btn>
+                  </div>
+                </q-item-section>
+              </q-item>
+
+              <q-item v-if="waitingListStudents.length === 0">
+                <q-item-section>Nenhum aluno na lista de espera.</q-item-section>
+              </q-item>
+            </q-list>
+          </q-tab-panel>
+        </q-tab-panels>
       </q-card-section>
     </q-card>
 
@@ -248,7 +313,8 @@ import { useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 import StudentDetailsDialog from 'src/components/admin-students/students/StudentDetailsDialog.vue'
 import dayjs from 'dayjs'
-import ClassServices from 'src/services/ClassServices.js'
+import ClassServices from 'src/services/classes/ClassServices.js'
+import { addStudentToWaitingList, restoreStudentFromWaitingList } from 'src/services/classes'
 import { setReplenishmentDatesForStudent } from 'src/services/students/index.js'
 import { getNextClassDayKey } from 'src/utils/dateHelpers.js'
 import UpdateClassDialog from 'src/components/UpdateClassDialog.vue'
@@ -325,6 +391,7 @@ const isAddDialogOpen = ref(false)
 const isAddReplenishmentDialogOpen = ref(false)
 const selectedStudentId = ref(null)
 const selectedReplenishmentDates = ref([])
+const studentsTab = ref('students')
 // details dialog state
 const detailStudentId = ref(null)
 const isDetailsOpen = ref(false)
@@ -335,6 +402,9 @@ const filteredStudents = ref([])
 
 const mainStudentIds = computed(() =>
   Array.isArray(classData.value?.studentIds) ? classData.value.studentIds : [],
+)
+const waitingListIds = computed(() =>
+  Array.isArray(classData.value?.waitingList) ? classData.value.waitingList : [],
 )
 const unscheduledIds = computed(() =>
   classData.value
@@ -370,12 +440,119 @@ const students = computed(() => {
       return {
         ...found,
         id: found.id || found.uid || sid,
+        isMainStudent: mainStudentIds.value.map(String).includes(sid),
         isUnscheduled: unscheduledIds.value.includes(sid),
         isReplenishment: replenishmentIds.value.includes(sid),
       }
     })
     .filter((student) => student !== null)
 })
+
+const waitingListStudents = computed(() => {
+  const byId = new Map(
+    studentList.value.map((student) => {
+      const sid = String(student.id || student.uid)
+      return [sid, student]
+    }),
+  )
+
+  return waitingListIds.value
+    .map((id) => {
+      const sid = String(id)
+      const found = byId.get(sid)
+      if (!found) return null
+
+      return {
+        ...found,
+        id: found.id || found.uid || sid,
+      }
+    })
+    .filter((student) => student !== null)
+})
+
+function updateLocalStudentClassIds(studentId, shouldAddClass) {
+  const sid = String(studentId)
+  const idx = studentList.value.findIndex((student) => String(student.id || student.uid) === sid)
+  if (idx === -1) return
+
+  const student = studentList.value[idx]
+  const currentClassIds = Array.isArray(student.classIds) ? student.classIds.map(String) : []
+
+  if (shouldAddClass) {
+    if (!currentClassIds.includes(String(classId))) {
+      studentList.value[idx] = {
+        ...student,
+        classIds: [...currentClassIds, String(classId)],
+      }
+    }
+    return
+  }
+
+  studentList.value[idx] = {
+    ...student,
+    classIds: currentClassIds.filter((id) => id !== String(classId)),
+  }
+}
+
+async function moveStudentToWaitingList(student) {
+  const sid = String(student.id || student.uid)
+
+  try {
+    await addStudentToWaitingList(classId, sid)
+
+    const nextStudentIds = mainStudentIds.value.map(String).filter((id) => id !== sid)
+    const nextWaitingList = Array.from(new Set([...waitingListIds.value.map(String), sid]))
+
+    classStore.updateClassInStore({
+      id: classId,
+      studentIds: nextStudentIds,
+      waitingList: nextWaitingList,
+    })
+
+    updateLocalStudentClassIds(sid, false)
+
+    $q.notify({
+      type: 'positive',
+      message: 'Aluno movido para lista de espera.',
+    })
+  } catch (error) {
+    console.error('Erro ao mover aluno para lista de espera:', error)
+    $q.notify({
+      type: 'negative',
+      message: 'Não foi possível mover o aluno para a lista de espera.',
+    })
+  }
+}
+
+async function restoreStudentToClass(student) {
+  const sid = String(student.id || student.uid)
+
+  try {
+    await restoreStudentFromWaitingList(classId, sid)
+
+    const nextStudentIds = Array.from(new Set([...mainStudentIds.value.map(String), sid]))
+    const nextWaitingList = waitingListIds.value.map(String).filter((id) => id !== sid)
+
+    classStore.updateClassInStore({
+      id: classId,
+      studentIds: nextStudentIds,
+      waitingList: nextWaitingList,
+    })
+
+    updateLocalStudentClassIds(sid, true)
+
+    $q.notify({
+      type: 'positive',
+      message: 'Aluno restaurado para turma.',
+    })
+  } catch (error) {
+    console.error('Erro ao restaurar aluno da lista de espera:', error)
+    $q.notify({
+      type: 'negative',
+      message: 'Não foi possível restaurar o aluno para a turma.',
+    })
+  }
+}
 
 function openAddStudentDialog() {
   fetchAvailableStudents('addClass')
