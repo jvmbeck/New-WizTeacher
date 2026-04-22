@@ -51,7 +51,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useUserStore } from 'src/stores/userStore.js'
-import ClassServices from 'src/services/ClassServices.js'
+import ClassServices from 'src/services/classes/ClassServices.js'
 
 const userStore = useUserStore()
 const teacherName = computed(() => userStore.userInfo?.name || '')

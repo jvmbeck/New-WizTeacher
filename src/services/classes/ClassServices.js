@@ -12,8 +12,8 @@ import {
   addDoc,
   deleteDoc,
 } from 'firebase/firestore'
-import { db } from '../key/configKey.js'
-import { getNextClassDayKey } from '../utils/dateHelpers.js'
+import { db } from '../../key/configKey.js'
+import { getNextClassDayKey } from '../../utils/dateHelpers.js'
 
 const ClassServices = {
   async createClass({ classDays, schedule, teacherId, classType, classDuration }) {

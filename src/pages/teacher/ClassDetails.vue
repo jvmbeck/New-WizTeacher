@@ -186,7 +186,7 @@ import {
   queryAbsences,
   fetchStudentsByIds,
 } from 'src/services/students/index'
-import classServices from '../../services/ClassServices.js'
+import classServices from '../../services/classes/ClassServices.js'
 import SaveLessonForm from 'src/components/SaveLessonForm.vue'
 import BookStructure from '../../data/bookStructure.json'
 import { useQuasar } from 'quasar'

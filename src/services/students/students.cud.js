@@ -11,7 +11,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from 'src/key/configKey.js'
-import classServices from 'src/services/ClassServices' // Adjust the path as necessary
+import classServices from 'src/services/classes/ClassServices' // Adjust the path as necessary
 
 export async function createStudent(studentData) {
   const docRef = await addDoc(collection(db, 'students'), studentData)

@@ -1,6 +1,6 @@
 // stores/classStore.js
 import { defineStore } from 'pinia'
-import ClassServices from '../services/ClassServices.js'
+import ClassServices from '../services/classes/ClassServices.js'
 
 export const useClassStore = defineStore('classStore', {
   state: () => ({
