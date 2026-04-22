@@ -2,8 +2,22 @@
   <q-layout view="hHh lpR fFf">
     <!-- Top App Bar -->
     <q-header elevated>
-      <q-toolbar>
-        <q-toolbar-title> WizTeacher </q-toolbar-title>
+      <q-toolbar class="toolbar-shell">
+        <q-btn flat no-caps class="title-btn" label="WizTeacher" @click="goToMainDashboard" />
+
+        <q-toolbar-title>
+          <div v-if="isAdmin" class="nav-pill-group">
+            <q-btn
+              v-for="item in mainNavItems"
+              :key="item.label"
+              unelevated
+              no-caps
+              class="nav-pill"
+              :label="item.label"
+              :to="item.to"
+            />
+          </div>
+        </q-toolbar-title>
 
         <!-- Avatar with Dropdown Menu -->
         <q-btn round color="white" class="q-ml-md">
@@ -50,15 +64,33 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import AuthServices from 'src/services/AuthServices'
 import { useRouter } from 'vue-router'
 import { Notify } from 'quasar'
 import { useUserStore } from 'src/stores/userStore.js'
 
 const userStore = useUserStore()
-const userName = userStore.userInfo?.name || 'Usuário Desconhecido'
-const userRole = userStore.userInfo?.role || 'Visitante'
+const userName = computed(() => userStore.userInfo?.name || 'Usuário Desconhecido')
+const userRole = computed(() => userStore.userInfo?.role || 'Visitante')
 const router = useRouter()
+
+const isAdmin = computed(() => userRole.value === 'admin')
+
+const mainNavItems = [
+  { label: 'Alunos', to: { name: 'StudentList' } },
+  { label: 'Professores', to: { name: 'teacherList' } },
+  { label: 'Turmas', to: { name: 'classList' } },
+]
+
+function goToMainDashboard() {
+  if (userRole.value === 'admin') {
+    router.push({ name: 'AdminDashboard' })
+    return
+  }
+
+  router.push({ name: 'TeacherDashboard' })
+}
 
 function goToSettings() {
   router.push('/settings')
@@ -83,5 +115,39 @@ function logout() {
 </script>
 
 <style scoped>
-/* Optional styling */
+.toolbar-shell {
+  gap: 12px;
+}
+
+.title-btn {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-radius: 12px;
+  padding: 6px 10px;
+}
+
+.nav-pill-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-pill {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0 12px;
+}
+
+.nav-pill:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 900px) {
+  .nav-pill-group {
+    display: none;
+  }
+}
 </style>
