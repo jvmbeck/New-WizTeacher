@@ -106,6 +106,7 @@ const daysOfWeek = [
 const classTypes = [
   { label: 'Mista', value: 'Mista' },
   { label: 'Kids', value: 'Kids' },
+  { label: 'Little Kids', value: 'Little Kids' },
   { label: 'Online', value: 'Online' },
 ]
 
