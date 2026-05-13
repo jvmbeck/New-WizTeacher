@@ -12,7 +12,8 @@
     "test": "echo \"No test specified\" && exit 0",
     "dev": "quasar dev",
     "build": "quasar build",
-    "postinstall": "quasar prepare"
+    "postinstall": "quasar prepare",
+    "deploy": "quasar build -m spa && firebase deploy --only hosting"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.4",
