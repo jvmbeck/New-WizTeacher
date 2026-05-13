@@ -1,5 +1,6 @@
 export * from './students.absences'
 export * from './students.classes'
+export * from './students.contracts'
 export * from './students.cud'
 export * from './students.fetch'
 export * from './students.lessons'
