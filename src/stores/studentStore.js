@@ -5,6 +5,12 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  fetchContractsByStudentId,
+  fetchActiveContract,
+  createContract,
+  updateContract,
+  setActiveContract,
+  closeContract,
 } from 'src/services/students/index'
 import { useClassStore } from './classStore'
 
@@ -82,6 +88,47 @@ export const useStudentStore = defineStore('studentStore', {
       }
 
       return res
+    },
+
+    // ── Contract actions ────────────────────────────────────────────────────
+    async fetchContractsByStudentId(studentId) {
+      return await fetchContractsByStudentId(studentId)
+    },
+    async fetchActiveContract(studentId) {
+      return await fetchActiveContract(studentId)
+    },
+    async createContract(studentId, contractData) {
+      const contract = await createContract(studentId, contractData)
+      // Sync currentContractId only when this new contract should become current
+      if (contractData?.setAsCurrent) {
+        const idx = this.students.findIndex((s) => s.id === studentId || s.uid === studentId)
+        if (idx !== -1) {
+          this.students[idx] = {
+            ...this.students[idx],
+            currentContractId: contract.id,
+            book: contract.book,
+            currentLesson: contract.currentLesson,
+          }
+        }
+      }
+      return contract
+    },
+    async updateContract(contractId, updates) {
+      return await updateContract(contractId, updates)
+    },
+    async setActiveContract(studentId, contractId) {
+      await setActiveContract(studentId, contractId)
+      const idx = this.students.findIndex((s) => s.id === studentId || s.uid === studentId)
+      if (idx !== -1) {
+        this.students[idx] = { ...this.students[idx], currentContractId: contractId }
+      }
+    },
+    async closeContract(studentId, contractId, closeData) {
+      await closeContract(studentId, contractId, closeData)
+      const idx = this.students.findIndex((s) => s.id === studentId || s.uid === studentId)
+      if (idx !== -1 && this.students[idx].currentContractId === contractId) {
+        this.students[idx] = { ...this.students[idx], currentContractId: null }
+      }
     },
   },
 })
