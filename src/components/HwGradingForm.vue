@@ -102,11 +102,10 @@ import { Notify } from 'quasar'
 import { doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore'
 import { db } from 'src/key/configKey'
 
-
 const props = defineProps({
   students: {
     type: Array,
-    required: true
+    required: true,
   },
 })
 
@@ -126,7 +125,7 @@ async function addEntry() {
   if (!selectedStudent.value) {
     Notify.create({
       type: 'negative',
-      message: 'Please select a student first.'
+      message: 'Please select a student first.',
     })
     return
   }
@@ -137,15 +136,15 @@ async function addEntry() {
   const lessonId = formLesson.value
 
   // Check if the lesson exists in lessonsCompleted
-  const completedDocId = `${studentBook}_${lessonId}_${studentId}`
-  console.log("CompletedDocId: " + completedDocId);
-  const docRef = doc(db, 'lessonsCompleted', completedDocId)
+  const completedDocId = `students/${studentId}/lessons/${studentBook}_${lessonId}`
+  console.log('CompletedDocId: ' + completedDocId)
+  const docRef = doc(db, completedDocId)
   const completedSnap = await getDoc(docRef)
 
   if (!completedSnap.exists()) {
     Notify.create({
       type: 'negative',
-      message: `Lesson ${lessonId} has not been completed yet. Cannot grade homework.`
+      message: `Lesson ${lessonId} has not been completed yet. Cannot grade homework.`,
     })
     return
   }
@@ -153,7 +152,7 @@ async function addEntry() {
   // Add the entry if validation passed
   homeworkList.value.push({
     lesson: lessonId,
-    grade: formGrade.value
+    grade: formGrade.value,
   })
 
   resetForm()
@@ -171,7 +170,7 @@ function editEntry(index) {
 function updateEntry() {
   homeworkList.value[editIndex.value] = {
     lesson: formLesson.value,
-    grade: formGrade.value
+    grade: formGrade.value,
   }
   resetForm()
 }
@@ -204,31 +203,39 @@ async function saveGrades() {
 
     // Update the lessonsCompleted record
     const completedDocRef = doc(db, 'lessonsCompleted', completedDocId)
-    batch.set(completedDocRef, {
-      gradeE: grade,
-      hwGradedAt: serverTimestamp()
-    }, { merge: true })
+    batch.set(
+      completedDocRef,
+      {
+        gradeE: grade,
+        hwGradedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
 
     // Update the student's subcollection record
     const studentLessonRef = doc(db, 'students', studentId, 'lessons', `${studentBook}_${lessonId}`)
-    batch.set(studentLessonRef, {
-      gradeE: grade,
-      hwGradedAt: serverTimestamp()
-    }, { merge: true })
+    batch.set(
+      studentLessonRef,
+      {
+        gradeE: grade,
+        hwGradedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
   }
 
   try {
     await batch.commit()
     Notify.create({
-    type: 'positive',
-    message: 'Homework grades saved successfully!'
-  })
-  emit('close')
-  resetAll()
+      type: 'positive',
+      message: 'Homework grades saved successfully!',
+    })
+    emit('close')
+    resetAll()
   } catch (error) {
     Notify.create({
       type: 'negative',
-      message: `Error saving grades: ${error.message}`
+      message: `Error saving grades: ${error.message}`,
     })
     return
   }
