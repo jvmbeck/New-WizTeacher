@@ -91,6 +91,15 @@ export async function saveLessonForStudent(studentId, lessonData) {
   const studentLessonRef = doc(db, 'students', studentId, 'lessons', lessonId)
   const globalLessonRef = doc(db, 'lessonsCompleted', `${lessonId}_${studentId}`)
 
+  // Resolve contractId: caller may supply it; otherwise fall back to student's active contract
+  const contractId = lessonData.contractId || studentData.currentContractId || null
+  console.log(
+    `[saveLessonForStudent] studentId=${studentId}, lessonId=${lessonId}, lessonData.contractId=${lessonData.contractId}, studentData.currentContractId=${studentData.currentContractId}, resolved contractId=${contractId}`,
+  )
+  if (contractId) {
+    fullLessonInfo.contractId = contractId
+  }
+
   batch.set(studentLessonRef, fullLessonInfo)
   batch.set(globalLessonRef, fullLessonInfo)
 
@@ -99,6 +108,16 @@ export async function saveLessonForStudent(studentId, lessonData) {
     batch.update(studentRef, {
       currentLesson: nextLesson,
     })
+    // Mirror progression into active contract if linked
+    const resolvedContractId = lessonData.contractId || studentData.currentContractId || null
+    if (resolvedContractId && nextLesson) {
+      const contractRef = doc(db, 'contracts', resolvedContractId)
+      const contractSnap = await getDoc(contractRef)
+      if (contractSnap.exists()) {
+        batch.update(contractRef, { currentLesson: nextLesson })
+        // If the contract had no currentLesson yet, this also serves as the soft-fill
+      }
+    }
   }
 
   // if pages were provided, append them to the student document's homeworkPages array

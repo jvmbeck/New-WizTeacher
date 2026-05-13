@@ -12,6 +12,7 @@ export async function fetchAllStudents() {
       currentLesson: data.currentLesson || '',
       classIds: data.classIds || null,
       totalAbsences: data.totalAbsences,
+      currentContractId: data.currentContractId ?? null,
     }
   })
   return students
@@ -20,7 +21,17 @@ export async function fetchStudentsByIds(studentIds) {
   const promises = studentIds.map((id) => getDoc(doc(db, 'students', id)))
   const snapshots = await Promise.all(promises)
 
-  return snapshots.filter((snap) => snap.exists()).map((snap) => ({ uid: snap.id, ...snap.data() }))
+  return snapshots
+    .filter((snap) => snap.exists())
+    .map((snap) => {
+      const data = snap.data()
+      return {
+        uid: snap.id,
+        ...data,
+        // Ensure key fields are always present
+        currentContractId: data.currentContractId ?? null,
+      }
+    })
 }
 
 export async function fetchStudentById(studentId) {
@@ -43,6 +54,7 @@ export async function fetchStudentById(studentId) {
       currentLesson: data.currentLesson ?? '',
       classIds: data.classIds ?? [],
       totalAbsences: data.totalAbsences ?? 0,
+      currentContractId: data.currentContractId ?? null,
     }
   } catch (error) {
     console.error('fetchStudentById error:', error)
