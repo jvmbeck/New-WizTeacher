@@ -292,6 +292,7 @@
           :rows="lessons"
           :columns="columns"
           row-key="id"
+          :table-row-class-fn="lessonRowClass"
           flat
           bordered
           dense
@@ -521,6 +522,14 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateWidth)
 })
 
+function isPlaceholderLesson(row) {
+  return String(row?.id || '').startsWith('placeholder_')
+}
+
+function lessonRowClass(row) {
+  return isPlaceholderLesson(row) ? 'placeholder-lesson-row' : ''
+}
+
 const columns = computed(() => [
   { name: 'lessonNumber', label: 'Lição', field: 'lessonNumber', align: 'left' },
   {
@@ -538,7 +547,16 @@ const columns = computed(() => [
     field: (row) => (row.noHomework ? 'não entregou' : (row.homeworkPages || []).join(', ') || '—'),
     align: 'left',
   },
-  { name: 'notes', label: 'Anotações', field: 'notes', align: 'left' },
+  {
+    name: 'notes',
+    label: 'Anotações',
+    field: 'notes',
+    align: 'left',
+    classes: 'notes-cell',
+    headerClasses: 'notes-cell',
+    style: 'max-width: 260px',
+    headerStyle: 'max-width: 260px',
+  },
   { name: 'gradeF', label: 'F', field: 'gradeF', align: 'center' },
   { name: 'gradeA', label: 'A', field: 'gradeA', align: 'center' },
   { name: 'gradeL', label: 'L', field: 'gradeL', align: 'center' },
@@ -620,6 +638,21 @@ const columns = computed(() => [
 
 .excel-style-table .q-tr:hover {
   background-color: #e0f7fa;
+}
+
+.excel-style-table :deep(.placeholder-lesson-row) {
+  background-color: #f6f7f8;
+}
+
+.excel-style-table :deep(.placeholder-lesson-row .q-td) {
+  color: #7c848d;
+}
+
+.excel-style-table :deep(.notes-cell) {
+  max-width: 260px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .grades-cell {
