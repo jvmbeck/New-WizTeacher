@@ -1,12 +1,16 @@
 import { ref, watch } from 'vue'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore'
 import { db } from 'src/key/configKey.js'
 import { useQuasar } from 'quasar'
 import { useClassStore } from 'src/stores/classStore'
 import { storeToRefs } from 'pinia'
 import { useStudentStore } from 'src/stores/studentStore'
-// helper that lets us write arbitrary fields without pulling in db
 import { patchStudent } from 'src/services/students'
+import {
+  fetchContractsByStudentId,
+  fetchLessonsByContract,
+  fetchAbsencesByContract,
+} from 'src/services/students/students.contracts.js'
 
 /**
  * Encapsulates all of the logic that was previously embedded in
@@ -37,6 +41,12 @@ export function useStudentDetails(initialId = null) {
   const classOptions = ref([])
   const showAbsences = ref(false)
 
+  // ── Contract state ──────────────────────────────────────────────────────
+  const contracts = ref([])
+  const selectedContractId = ref(null)
+  const currentContract = ref(null)
+  const loadingContracts = ref(false)
+
   const { classMap } = storeToRefs(classStore)
 
   async function fetchStudentAbsences(id) {
@@ -45,45 +55,37 @@ export function useStudentDetails(initialId = null) {
     absences.value = []
 
     try {
-      // make sure the class store is populated so we can resolve names
       await classStore.fetchClasses()
 
-      const absencesQuery = query(collection(db, 'absences'), where('studentId', '==', id))
-      const querySnapshot = await getDocs(absencesQuery)
+      // Use contract-scoped query when a contract is selected; fall back to global query
+      if (selectedContractId.value) {
+        absences.value = await fetchAbsencesByContract(id, selectedContractId.value)
+      } else {
+        const absencesQuery = query(collection(db, 'absences'), where('studentId', '==', id))
+        const querySnapshot = await getDocs(absencesQuery)
 
-      console.log(
-        'raw absence docs:',
-        querySnapshot.docs.map((d) => d.data()),
-      )
+        absences.value = querySnapshot.docs
+          .map((doc) => {
+            const data = doc.data()
+            const [year, month, day] = data.date.split('-')
+            const formattedDate = `${day}/${month}/${year.slice(-2)}`
+            return { id: doc.id, ...data, formattedDate }
+          })
+          .sort((a, b) => b.date.localeCompare(a.date))
+      }
 
-      absences.value = querySnapshot.docs
-        .map((doc) => {
-          const data = doc.data()
-          const [year, month, day] = data.date.split('-')
-          const formattedDate = `${day}/${month}/${year.slice(-2)}`
-          return {
-            id: doc.id,
-            ...data,
-            formattedDate,
-          }
-        })
-        .sort((a, b) => b.date.localeCompare(a.date))
-
-      // debug: compare against counter on student document
-      if (student.value && typeof student.value.totalAbsences !== 'undefined') {
+      // Reconcile global counter on student doc (only for unscoped view)
+      if (
+        !selectedContractId.value &&
+        student.value &&
+        typeof student.value.totalAbsences !== 'undefined'
+      ) {
         if (absences.value.length !== student.value.totalAbsences) {
           console.warn(
             `mismatch for ${id}: counter=${student.value.totalAbsences}, docs=${absences.value.length}`,
           )
-
-          // write the correct value back so future loads are consistent
           try {
-            // write using the service helper instead of importing
-            // Firestore APIs directly; this keeps our DB references
-            // concentrated in the services layer.
             await patchStudent(id, { totalAbsences: absences.value.length })
-
-            // keep in-memory copy in sync as well
             student.value.totalAbsences = absences.value.length
             console.info(`corrected totalAbsences for ${id} to ${absences.value.length}`)
           } catch (err) {
@@ -128,15 +130,107 @@ export function useStudentDetails(initialId = null) {
         console.error('No such student found in Firestore!')
       }
 
-      const lessonsRef = collection(db, 'students', id, 'lessons')
-      const lessonSnaps = await getDocs(lessonsRef)
-      lessons.value = lessonSnaps.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
+      // Fetch lessons: scoped to selected contract or load all if no contract selected
+      await fetchLessonsForSelectedContract(id)
     } catch (error) {
       console.error('Error fetching student data:', error)
     }
+  }
+
+  async function fetchLessonsForSelectedContract(id) {
+    const sid = id || studentId.value
+    if (!sid) return
+    if (selectedContractId.value) {
+      // Try to fetch lessons scoped to the selected contract
+      let contractLessons = await fetchLessonsByContract(sid, selectedContractId.value)
+
+      // Fallback: if no lessons found for this contract (backwards compat with untagged lessons),
+      // fetch all lessons for the student. They will be shown in the lessons table.
+      if (contractLessons.length === 0) {
+        const lessonsRef = collection(db, 'students', sid, 'lessons')
+        const lessonSnaps = await getDocs(lessonsRef)
+        contractLessons = lessonSnaps.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        console.warn(
+          `No lessons with contractId found for contract ${selectedContractId.value}; showing all lessons for backwards compatibility`,
+        )
+      }
+
+      lessons.value = contractLessons
+    } else {
+      const lessonsRef = collection(db, 'students', sid, 'lessons')
+      const lessonSnaps = await getDocs(lessonsRef)
+      lessons.value = lessonSnaps.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    }
+  }
+
+  // ── Contract loading ────────────────────────────────────────────────────
+  async function loadContracts(id) {
+    if (!id) return
+    loadingContracts.value = true
+    try {
+      contracts.value = await fetchContractsByStudentId(id)
+
+      // Determine selected contract: prefer currentContractId from student doc
+      const studentCurrentContractId = student.value?.currentContractId ?? null
+      if (studentCurrentContractId) {
+        selectedContractId.value = studentCurrentContractId
+      } else if (contracts.value.length) {
+        // Fall back to the most recent active contract, then just the first one
+        const active = contracts.value.find((c) => c.status === 'active')
+        selectedContractId.value = (active ?? contracts.value[0]).id
+      }
+
+      currentContract.value = contracts.value.find((c) => c.id === selectedContractId.value) ?? null
+
+      // Option A soft-fix: if active contract has no currentLesson, write student.currentLesson into it
+      if (
+        currentContract.value &&
+        currentContract.value.status === 'active' &&
+        !currentContract.value.currentLesson &&
+        student.value?.currentLesson
+      ) {
+        try {
+          const contractRef = doc(db, 'contracts', currentContract.value.id)
+          await updateDoc(contractRef, { currentLesson: student.value.currentLesson })
+          currentContract.value = {
+            ...currentContract.value,
+            currentLesson: student.value.currentLesson,
+          }
+          const idx = contracts.value.findIndex((c) => c.id === currentContract.value.id)
+          if (idx !== -1)
+            contracts.value[idx] = {
+              ...contracts.value[idx],
+              currentLesson: student.value.currentLesson,
+            }
+        } catch (e) {
+          console.warn('Could not soft-fill currentLesson on contract:', e)
+        }
+      }
+
+      // Auto-heal: if student.currentContractId is null but an active contract exists, set it
+      if (!studentCurrentContractId && currentContract.value?.status === 'active') {
+        try {
+          const studentRef = doc(db, 'students', id)
+          await updateDoc(studentRef, { currentContractId: currentContract.value.id })
+          if (student.value) student.value.currentContractId = currentContract.value.id
+        } catch (e) {
+          console.warn('Could not auto-heal currentContractId:', e)
+        }
+      }
+    } catch (err) {
+      console.error('Error loading contracts:', err)
+    } finally {
+      loadingContracts.value = false
+    }
+  }
+
+  async function selectContract(contractId) {
+    selectedContractId.value = contractId
+    currentContract.value = contracts.value.find((c) => c.id === contractId) ?? null
+    // Reload lessons and clear absences so they are refetched on next toggle
+    await fetchLessonsForSelectedContract()
+    absences.value = []
+    showAbsences.value = false
   }
 
   async function load(id) {
@@ -153,6 +247,8 @@ export function useStudentDetails(initialId = null) {
 
     // fetch student document only; the absence list is fetched on demand
     await fetchStudentData(id)
+    // load all contracts for this student
+    await loadContracts(id)
   }
 
   // automatically reload when the passed-in id changes
@@ -192,6 +288,13 @@ export function useStudentDetails(initialId = null) {
     className,
     classOptions,
     showAbsences,
+    // contract state
+    contracts,
+    selectedContractId,
+    currentContract,
+    loadingContracts,
+    selectContract,
+    loadContracts,
     saveChanges,
     discardChanges,
     load,

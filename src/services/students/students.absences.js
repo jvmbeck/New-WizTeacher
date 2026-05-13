@@ -20,24 +20,30 @@ export async function markStudentAbsent(absenceData) {
   const absenceRef = doc(db, 'absences', absenceId)
   const studentRef = doc(db, 'students', absenceData.studentId)
   const studentSnap = await getDoc(studentRef)
+  const studentDocData = studentSnap.data()
 
-  const currentAbsences = studentSnap.data().totalAbsences || 0
+  const currentAbsences = studentDocData.totalAbsences || 0
+
+  // Resolve contractId from caller or from student's active contract
+  const contractId = absenceData.contractId || studentDocData.currentContractId || null
+  const contractRef = contractId ? doc(db, 'contracts', contractId) : null
 
   // transaction ensures absence marking and counter update happen together.
   await runTransaction(db, async (transaction) => {
+    const contractSnap = contractRef ? await transaction.get(contractRef) : null
+    const contractAbsences = contractSnap?.exists() ? contractSnap.data().totalAbsences || 0 : 0
+
     // Check if absence already exists
     const absenceDoc = await transaction.get(absenceRef)
     if (absenceDoc.exists()) {
       transaction.delete(absenceRef)
-      // Write: decrement totalAbsences
-      transaction.update(studentRef, {
-        totalAbsences: currentAbsences - 1,
-      })
+      transaction.update(studentRef, { totalAbsences: currentAbsences - 1 })
+      if (contractRef && contractSnap?.exists()) {
+        transaction.update(contractRef, { totalAbsences: Math.max(0, contractAbsences - 1) })
+      }
       console.log('Student already marked as absent, removing record')
     } else {
-      // Write: mark the absence
       console.log('Marking student as absent')
-
       transaction.set(absenceRef, {
         studentId: stuId,
         classId,
@@ -45,11 +51,12 @@ export async function markStudentAbsent(absenceData) {
         recordedAt: serverTimestamp(),
         type: 'absence',
         reason: 'Não estava presente na aula',
+        ...(contractId ? { contractId } : {}),
       })
-      // Write: increment totalAbsences
-      transaction.update(studentRef, {
-        totalAbsences: currentAbsences + 1,
-      })
+      transaction.update(studentRef, { totalAbsences: currentAbsences + 1 })
+      if (contractRef && contractSnap?.exists()) {
+        transaction.update(contractRef, { totalAbsences: contractAbsences + 1 })
+      }
     }
   })
 }

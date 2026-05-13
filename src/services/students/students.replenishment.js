@@ -22,6 +22,7 @@ export async function scheduleReplenishment({
   replenishmentClassId,
   replenishmentDate,
   notes = '',
+  contractId = null,
 }) {
   const batch = writeBatch(db)
 
@@ -39,6 +40,7 @@ export async function scheduleReplenishment({
     recordedAt: serverTimestamp(),
     completedAt: null,
     notes,
+    ...(contractId ? { contractId } : {}),
   })
 
   // 2. Add to class's replenishmentStudents array
@@ -68,6 +70,17 @@ export async function scheduleReplenishment({
     batch.update(studentRef, {
       pendingReplenishments: (studentData.pendingReplenishments || 0) + 1,
     })
+    // Increment contract-level counter if contractId is known
+    const resolvedContractId = contractId || studentData.currentContractId || null
+    if (resolvedContractId) {
+      const contractRef = doc(db, 'contracts', resolvedContractId)
+      const contractSnap = await getDoc(contractRef)
+      if (contractSnap.exists()) {
+        batch.update(contractRef, {
+          pendingReplenishments: (contractSnap.data().pendingReplenishments || 0) + 1,
+        })
+      }
+    }
   }
 
   try {
@@ -133,6 +146,17 @@ export async function cancelReplenishment(replenishmentId) {
     batch.update(studentRef, {
       pendingReplenishments: Math.max(0, (studentData.pendingReplenishments || 0) - 1),
     })
+    // Decrement contract-level counter if contractId present on the replenishment doc
+    const contractId = replenishmentData.contractId || studentData.currentContractId || null
+    if (contractId) {
+      const contractRef = doc(db, 'contracts', contractId)
+      const contractSnap = await getDoc(contractRef)
+      if (contractSnap.exists()) {
+        batch.update(contractRef, {
+          pendingReplenishments: Math.max(0, (contractSnap.data().pendingReplenishments || 0) - 1),
+        })
+      }
+    }
   }
 
   try {
@@ -302,6 +326,19 @@ export async function setReplenishmentDatesForStudent(
     pendingReplenishments: nextPending,
   })
 
+  // Update contract-level counter if student has an active contract
+  if (studentData.currentContractId && pendingDelta !== 0) {
+    const contractRef = doc(db, 'contracts', studentData.currentContractId)
+    const contractSnap = await getDoc(contractRef)
+    if (contractSnap.exists()) {
+      const nextContractPending = Math.max(
+        0,
+        (contractSnap.data().pendingReplenishments || 0) + pendingDelta,
+      )
+      batch.update(contractRef, { pendingReplenishments: nextContractPending })
+    }
+  }
+
   addedDates.forEach((dateKey) => {
     const replenishmentId = `${sid}_${classId}_${dateKey}`
     const replenishmentRef = doc(db, 'replenishments', replenishmentId)
@@ -317,6 +354,7 @@ export async function setReplenishmentDatesForStudent(
       recordedAt: serverTimestamp(),
       completedAt: null,
       notes,
+      ...(studentData.currentContractId ? { contractId: studentData.currentContractId } : {}),
     })
   })
 

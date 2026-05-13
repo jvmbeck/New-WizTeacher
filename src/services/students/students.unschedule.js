@@ -106,6 +106,7 @@ export async function unscheduleStudent(classId, studentId, selectedDates = []) 
       recordedAt: serverTimestamp(),
       type: 'unschedule',
       reason: 'Aula desmarcada',
+      ...(studentData?.currentContractId ? { contractId: studentData.currentContractId } : {}),
     })
   })
 
@@ -113,6 +114,19 @@ export async function unscheduleStudent(classId, studentId, selectedDates = []) 
     const globalAbsencesRef = doc(db, 'absences', `${sid}_${classId}_${dateKey}`)
     batch.delete(globalAbsencesRef)
   })
+
+  // Update contract-level totalAbsences counter if student has an active contract
+  if (studentData?.currentContractId && totalAbsencesDelta !== 0) {
+    const contractRef = doc(db, 'contracts', studentData.currentContractId)
+    const contractSnap = await getDoc(contractRef)
+    if (contractSnap.exists()) {
+      const nextContractAbsences = Math.max(
+        0,
+        (contractSnap.data().totalAbsences || 0) + totalAbsencesDelta,
+      )
+      batch.update(contractRef, { totalAbsences: nextContractAbsences })
+    }
+  }
 
   try {
     await batch.commit()

@@ -281,6 +281,7 @@ const handleLessonSaved = async (lessonData) => {
           ...lessonData.lesson,
           pendingCheck: false,
           classId: classId,
+          contractId: student.currentContractId || null,
         })
       ) {
         $q.notify({ type: 'positive', message: 'Lição salva com sucesso!' })
@@ -295,6 +296,7 @@ const handleLessonSaved = async (lessonData) => {
           ...lessonData.lesson,
           pendingCheck: true,
           classId: classId,
+          contractId: student.currentContractId || null,
         })
       ) {
         $q.notify({ type: 'positive', message: 'Lição salva como pendente!' })
@@ -336,7 +338,13 @@ const markAbsent = async (studentId) => {
   })
     .onOk(async () => {
       try {
-        await markStudentAbsent({ studentId, classId, type: 'absence' })
+        const student = students.value.find((s) => s.uid === studentId)
+        await markStudentAbsent({
+          studentId,
+          classId,
+          type: 'absence',
+          contractId: student?.currentContractId || null,
+        })
         await updateClassAbsences()
       } catch (err) {
         console.error('Error toggling absence:', err)

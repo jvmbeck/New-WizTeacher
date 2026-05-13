@@ -48,5 +48,10 @@ service cloud.firestore {
     match /replenishments/{docId} {
       allow write: if isTeacherOrAdmin();
     }
+
+    // Contracts - only teachers/admins can write
+    match /contracts/{contractId} {
+      allow write: if isTeacherOrAdmin();
+    }
   }
 }

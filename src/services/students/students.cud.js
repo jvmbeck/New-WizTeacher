@@ -12,9 +12,13 @@ import {
 } from 'firebase/firestore'
 import { db } from 'src/key/configKey.js'
 import classServices from 'src/services/classes/ClassServices' // Adjust the path as necessary
+// imported lazily inside createStudent to avoid circular import
+// (students.contracts imports students.fetch which imports from here via index)
+import { createContract } from 'src/services/students/students.contracts.js'
 
 export async function createStudent(studentData) {
   const docRef = await addDoc(collection(db, 'students'), studentData)
+  const studentId = docRef.id
 
   // Normalize classIds so callers may pass either an array of ids
   // or an array of option objects ({ label, value }) from the UI.
@@ -24,18 +28,46 @@ export async function createStudent(studentData) {
 
   if (normalizedNewClassIds.length > 0) {
     const batch = writeBatch(db)
-
     normalizedNewClassIds.forEach((classId) => {
       const classRef = doc(db, 'classes', classId)
-      batch.update(classRef, {
-        studentIds: arrayUnion(docRef.id),
-      })
+      batch.update(classRef, { studentIds: arrayUnion(studentId) })
     })
-
     await batch.commit()
   }
 
-  return { id: docRef.id, ...studentData, classIds: normalizedNewClassIds }
+  // Create initial contract if enough data was provided (book + contract number + dates)
+  if (studentData.book && studentData.contract) {
+    try {
+      console.log(
+        `[createStudent] Creating initial contract for student ${studentId}: contract=${studentData.contract}, book=${studentData.book}`,
+      )
+      const newContract = await createContract(studentId, {
+        contractNumber: studentData.contract,
+        book: studentData.book,
+        startingLesson: studentData.currentLesson || '',
+        currentLesson: studentData.currentLesson || '',
+        startDate: (studentData.bookStartDate || '').replaceAll('/', '-'),
+        endDate: (studentData.bookEndDate || '').replaceAll('/', '-'),
+        exchangeDate: studentData.bookExchangeDate
+          ? studentData.bookExchangeDate.replaceAll('/', '-')
+          : null,
+        isPartB: !!studentData.bookExchangeDate,
+        setAsCurrent: true,
+      })
+      console.log(`[createStudent] Contract created successfully with ID: ${newContract.id}`)
+    } catch (err) {
+      console.error(
+        `[createStudent] Failed to create initial contract for new student ${studentId}:`,
+        err,
+      )
+    }
+  } else {
+    console.log(
+      `[createStudent] Skipping contract creation: book="${studentData.book}", contract="${studentData.contract}"`,
+    )
+  }
+
+  return { id: studentId, ...studentData, classIds: normalizedNewClassIds }
 }
 
 export async function updateStudent(studentId, updatedData, oldClassIds = []) {
@@ -50,12 +82,11 @@ export async function updateStudent(studentId, updatedData, oldClassIds = []) {
     : []
 
   // Update student document with the normalized classIds array
-  await updateDoc(studentRef, {
-    name,
-    book,
-    currentLesson,
-    classIds: normalizedClassIds,
-  })
+  const studentUpdatePayload = { name, book, currentLesson, classIds: normalizedClassIds }
+  if (updatedData.currentContractId !== undefined) {
+    studentUpdatePayload.currentContractId = updatedData.currentContractId
+  }
+  await updateDoc(studentRef, studentUpdatePayload)
 
   // Normalize oldClassIds as well (they may come from the store and be
   // objects if the UI previously stored option objects). This prevents
