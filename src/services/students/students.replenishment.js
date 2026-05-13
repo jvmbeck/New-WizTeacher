@@ -11,6 +11,29 @@ import {
 import { db } from 'src/key/configKey.js'
 import { findNextClassDate, formatLocalDateKey } from 'src/utils/dateHelpers.js'
 
+async function resolveContractIdForStudent(
+  studentId,
+  preferredContractId = null,
+  studentData = null,
+) {
+  if (preferredContractId) return preferredContractId
+
+  const currentFromStudent = studentData?.currentContractId || null
+  if (currentFromStudent) return currentFromStudent
+
+  const activeQ = query(
+    collection(db, 'contracts'),
+    where('studentId', '==', String(studentId)),
+    where('status', '==', 'active'),
+  )
+  const activeSnap = await getDocs(activeQ)
+  if (!activeSnap.empty) {
+    return activeSnap.docs[0].id
+  }
+
+  return null
+}
+
 /**
  * Schedule a replenishment for a student
  * Creates replenishment record, updates class array, and increments student counter
@@ -26,22 +49,9 @@ export async function scheduleReplenishment({
 }) {
   const batch = writeBatch(db)
 
-  // 1. Create replenishment record in collection
+  // 1. Prepare replenishment record id/ref
   const replenishmentId = `${studentId}_${replenishmentClassId}_${replenishmentDate}`
   const replenishmentRef = doc(db, 'replenishments', replenishmentId)
-
-  batch.set(replenishmentRef, {
-    studentId,
-    studentName,
-    missedDate,
-    replenishmentClassId,
-    replenishmentDate,
-    status: 'scheduled',
-    recordedAt: serverTimestamp(),
-    completedAt: null,
-    notes,
-    ...(contractId ? { contractId } : {}),
-  })
 
   // 2. Add to class's replenishmentStudents array
   const classRef = doc(db, 'classes', replenishmentClassId)
@@ -64,14 +74,28 @@ export async function scheduleReplenishment({
   // 3. Increment student's pending replenishments counter
   const studentRef = doc(db, 'students', studentId)
   const studentSnap = await getDoc(studentRef)
+  const studentData = studentSnap.exists() ? studentSnap.data() : null
+  const resolvedContractId = await resolveContractIdForStudent(studentId, contractId, studentData)
 
-  if (studentSnap.exists()) {
-    const studentData = studentSnap.data()
+  // 4. Create replenishment record with resolved contractId
+  batch.set(replenishmentRef, {
+    studentId,
+    studentName,
+    missedDate,
+    replenishmentClassId,
+    replenishmentDate,
+    status: 'scheduled',
+    recordedAt: serverTimestamp(),
+    completedAt: null,
+    notes,
+    ...(resolvedContractId ? { contractId: resolvedContractId } : {}),
+  })
+
+  if (studentData) {
     batch.update(studentRef, {
       pendingReplenishments: (studentData.pendingReplenishments || 0) + 1,
     })
     // Increment contract-level counter if contractId is known
-    const resolvedContractId = contractId || studentData.currentContractId || null
     if (resolvedContractId) {
       const contractRef = doc(db, 'contracts', resolvedContractId)
       const contractSnap = await getDoc(contractRef)
@@ -253,6 +277,7 @@ export async function setReplenishmentDatesForStudent(
 
   const classData = classSnap.data()
   const studentData = studentSnap.data()
+  const resolvedContractId = await resolveContractIdForStudent(sid, null, studentData)
   const studentName = studentData.studentName || studentData.name || 'Aluno'
 
   const replenishmentByDate = classData.replenishmentStudents || {}
@@ -326,9 +351,9 @@ export async function setReplenishmentDatesForStudent(
     pendingReplenishments: nextPending,
   })
 
-  // Update contract-level counter if student has an active contract
-  if (studentData.currentContractId && pendingDelta !== 0) {
-    const contractRef = doc(db, 'contracts', studentData.currentContractId)
+  // Update contract-level counter if student has an active/resolved contract
+  if (resolvedContractId && pendingDelta !== 0) {
+    const contractRef = doc(db, 'contracts', resolvedContractId)
     const contractSnap = await getDoc(contractRef)
     if (contractSnap.exists()) {
       const nextContractPending = Math.max(
@@ -354,7 +379,7 @@ export async function setReplenishmentDatesForStudent(
       recordedAt: serverTimestamp(),
       completedAt: null,
       notes,
-      ...(studentData.currentContractId ? { contractId: studentData.currentContractId } : {}),
+      ...(resolvedContractId ? { contractId: resolvedContractId } : {}),
     })
   })
 
