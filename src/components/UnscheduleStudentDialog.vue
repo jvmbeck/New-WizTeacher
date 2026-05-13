@@ -47,6 +47,7 @@ const classStore = useClassStore()
 
 const studentId = ref(null)
 const studentName = ref('')
+const contractId = ref(null)
 const selectedDates = ref([])
 const dialogOpen = ref(false)
 
@@ -56,6 +57,7 @@ function open(student) {
   const sid = String(student.id || student.uid)
   studentId.value = sid
   studentName.value = student.name || ''
+  contractId.value = student.currentContractId || null
   const existingDates = getUnscheduledDatesForStudent(sid)
   selectedDates.value = Array.isArray(existingDates) ? existingDates : []
   dialogOpen.value = true
@@ -146,6 +148,7 @@ async function handleSave() {
       missedDates: result.addedDates,
       classId: props.classId,
       className: classData.value?.className || 'Turma',
+      contractId: contractId.value,
     })
   }
 

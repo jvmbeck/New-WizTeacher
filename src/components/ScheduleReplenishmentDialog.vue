@@ -109,6 +109,7 @@ const studentName = ref('')
 const missedDates = ref([])
 const classId = ref(null)
 const className = ref('')
+const contractId = ref(null)
 const replenishments = ref([])
 
 const classOptions = computed(() => {
@@ -130,6 +131,7 @@ function open(data) {
   missedDates.value = data.missedDates || []
   classId.value = data.classId
   className.value = data.className || 'Turma'
+  contractId.value = data.contractId || null
 
   // Initialize replenishment entries for each missed date
   replenishments.value = missedDates.value.map((missedDate) => ({
@@ -165,6 +167,7 @@ async function handleSave() {
       replenishmentClassId: replenishment.classId,
       replenishmentDate: replenishment.date,
       notes: replenishment.notes,
+      contractId: contractId.value,
     })
   })
 
