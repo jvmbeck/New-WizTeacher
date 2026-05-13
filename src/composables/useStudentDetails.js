@@ -6,6 +6,7 @@ import { useClassStore } from 'src/stores/classStore'
 import { storeToRefs } from 'pinia'
 import { useStudentStore } from 'src/stores/studentStore'
 import { patchStudent } from 'src/services/students'
+import bookStructure from 'src/data/bookStructure.json'
 import {
   fetchContractsByStudentId,
   fetchLessonsByContract,
@@ -138,6 +139,55 @@ export function useStudentDetails(initialId = null) {
   }
 
   async function fetchLessonsForSelectedContract(id) {
+    const buildLessonsGrid = (book, lessonDocs) => {
+      const docs = Array.isArray(lessonDocs) ? lessonDocs : []
+      const structure = book ? bookStructure[book] : null
+
+      // If book structure is unknown, keep current behavior and return fetched docs only.
+      if (!Array.isArray(structure) || structure.length === 0) {
+        return docs
+      }
+
+      const docsByLesson = new Map(
+        docs
+          .filter((d) => d && d.lessonNumber !== undefined && d.lessonNumber !== null)
+          .map((d) => [String(d.lessonNumber), d]),
+      )
+
+      const merged = structure.map((lessonNumber) => {
+        const key = String(lessonNumber)
+        const existing = docsByLesson.get(key)
+
+        if (existing) {
+          return {
+            ...existing,
+            lessonNumber: existing.lessonNumber ?? key,
+          }
+        }
+
+        // UI-only placeholder row: keeps full lesson list visible even before a lesson is saved.
+        return {
+          id: `placeholder_${book}_${key}`,
+          lessonNumber: key,
+          completedAt: null,
+          homeworkPages: [],
+          noHomework: false,
+          notes: '',
+          gradeF: '',
+          gradeA: '',
+          gradeL: '',
+          gradeE: '',
+          teacherName: '',
+          status: '',
+          pendingCheck: false,
+        }
+      })
+
+      // Preserve any legacy/extra lesson docs that are not part of this book's structure.
+      const extras = docs.filter((d) => !structure.includes(String(d.lessonNumber)))
+      return [...merged, ...extras]
+    }
+
     const sid = id || studentId.value
     if (!sid) return
     if (selectedContractId.value) {
@@ -155,11 +205,14 @@ export function useStudentDetails(initialId = null) {
         )
       }
 
-      lessons.value = contractLessons
+      const selectedBook = currentContract.value?.book || student.value?.book || ''
+      lessons.value = buildLessonsGrid(selectedBook, contractLessons)
     } else {
       const lessonsRef = collection(db, 'students', sid, 'lessons')
       const lessonSnaps = await getDocs(lessonsRef)
-      lessons.value = lessonSnaps.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      const allLessons = lessonSnaps.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      const selectedBook = student.value?.book || ''
+      lessons.value = buildLessonsGrid(selectedBook, allLessons)
     }
   }
 
@@ -249,6 +302,8 @@ export function useStudentDetails(initialId = null) {
     await fetchStudentData(id)
     // load all contracts for this student
     await loadContracts(id)
+    // ensure the table is aligned with the selected/current contract book
+    await fetchLessonsForSelectedContract(id)
   }
 
   // automatically reload when the passed-in id changes
