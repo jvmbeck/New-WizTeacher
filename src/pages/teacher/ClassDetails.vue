@@ -34,6 +34,8 @@
             :color="
               student.isAbsentToday ? 'red-5' : student.isReplenishment ? 'amber-9' : 'blue-8'
             "
+            style="cursor: pointer"
+            @click="studentLessonsDialogRef?.open(student)"
           >
             <div class="full-center avatar-initials">
               {{
@@ -173,10 +175,12 @@
   <q-dialog v-model="isSaveHomeworkFormOpen" persistent>
     <HwGradingForm @close="isSaveHomeworkFormOpen = false" :students="students" />
   </q-dialog>
+  <StudentLessonsDialog ref="studentLessonsDialogRef" />
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import StudentLessonsDialog from 'src/components/teacher/StudentLessonsDialog.vue'
 import { useRoute } from 'vue-router'
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../../key/configKey.js'
@@ -207,6 +211,7 @@ const selectedStudentLesson = ref(null)
 const selectedStudentId = ref(null)
 const isSaveLessonFormOpen = ref(false)
 const isSaveHomeworkFormOpen = ref(false)
+const studentLessonsDialogRef = ref(null)
 
 const copyStudentInfo = (student) => {
   const text = `${student.name} - ${student.currentLesson}/${getNextLessonLabel(student.currentLesson, student.book)} - ${student.book}`
