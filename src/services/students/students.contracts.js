@@ -287,5 +287,28 @@ export async function fetchReplenishmentsByContract(studentId, contractId) {
     where('contractId', '==', contractId),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  if (!snap.empty) {
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  }
+
+  // Legacy compatibility: older replenishment docs may be missing contractId.
+  // If strict contract query returns nothing, load scheduled records for the student,
+  // then assign this contractId so future queries are consistent.
+  const legacyQ = query(
+    collection(db, 'replenishments'),
+    where('studentId', '==', studentId),
+    where('status', '==', 'scheduled'),
+  )
+  const legacySnap = await getDocs(legacyQ)
+  const legacyDocs = legacySnap.docs.filter((d) => !d.data().contractId)
+
+  if (!legacyDocs.length) {
+    return []
+  }
+
+  await Promise.allSettled(
+    legacyDocs.map((d) => updateDoc(doc(db, 'replenishments', d.id), { contractId })),
+  )
+
+  return legacyDocs.map((d) => ({ id: d.id, ...d.data(), contractId }))
 }
