@@ -5,7 +5,7 @@
         <div class="text-h6">Save Lesson Info</div>
       </q-card-section>
 
-      <q-form v-if="!endOfBook" @submit.prevent="submitLesson" class="q-gutter-md">
+      <q-form @submit.prevent="submitLesson" class="q-gutter-md">
         <!-- make the form section scrollable on small screens -->
         <q-card-section class="card-body">
           <div class="row q-col-gutter-md">
@@ -71,16 +71,12 @@
           <q-btn type="submit" label="Save" color="primary" />
         </q-card-actions>
       </q-form>
-      <div v-else class="q-pa-md text-red text-bold">
-        This book has ended. Please check the student's homework before assigning a new book.
-      </div>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
-import books from '../data/bookStructure.json'
 
 const props = defineProps({
   book: String,
@@ -93,7 +89,6 @@ const noHomework = ref(false) // true when student brought none
 
 const emit = defineEmits(['update:modelValue', 'lessonSaved'])
 
-const endOfBook = ref(false)
 const isOpen = ref(props.modelValue)
 const lesson = ref({
   book: '',
@@ -125,26 +120,7 @@ watch(
     if (val) {
       lesson.value.book = props.book || ''
       lesson.value.lessonNumber = props.lessonNumber || ''
-      const bookLessons = books[lesson.value.book]
 
-      if (!bookLessons) {
-        console.warn(`Book "${lesson.value.book}" not found in books structure`)
-        lesson.value = null
-        endOfBook.value = true
-        return
-      }
-      const currentIndex = bookLessons.indexOf(String(lesson.value.lessonNumber))
-
-      // If lessonNumber is not in list OR it's beyond the last index => book finished
-      const isEndOfBook = currentIndex === -1 || currentIndex >= bookLessons.length
-
-      if (isEndOfBook) {
-        lesson.value = null
-        endOfBook.value = true
-        return
-      }
-
-      endOfBook.value = false
       pendingCheck.value = false
       noHomework.value = false
       for (const field of gradeFields) {
