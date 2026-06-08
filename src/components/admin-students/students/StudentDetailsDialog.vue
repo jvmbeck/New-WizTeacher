@@ -133,7 +133,7 @@
         />
 
         <!-- Active contract metadata -->
-        <div v-if="currentContract" class="contract-meta q-pa-sm rounded-borders bg-grey-1">
+        <div v-if="currentContract" class="contract-meta q-pa-sm rounded-borders q-mb-sm">
           <div class="row q-col-gutter-sm">
             <div class="col-6 col-sm-4">
               <div class="text-caption text-grey-7">Nº Contrato</div>
@@ -641,7 +641,7 @@ const columns = computed(() => [
 }
 
 .excel-style-table :deep(.placeholder-lesson-row) {
-  background-color: #f6f7f8;
+  background-color: var(--placeholder-lesson);
 }
 
 .excel-style-table :deep(.placeholder-lesson-row .q-td) {

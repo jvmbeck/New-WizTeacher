@@ -105,7 +105,6 @@ const filteredClasses = computed(() => {
   align-items: center;
   overflow-y: auto;
   margin-top: 16px;
-  background: #fff;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);

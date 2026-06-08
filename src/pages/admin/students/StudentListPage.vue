@@ -1,10 +1,10 @@
 <template>
   <q-page padding>
     <div class="buttons-container">
-      <q-btn to="/AdminDashboard" label="Início" />
+      <q-btn class="btns" to="/AdminDashboard" label="Início" />
       <q-input
         v-model="searchQuery"
-        label="Pesquisar alunos, livros ou turmas"
+        label="Digite nome do aluno, livro ou turma"
         outlined
         debounce="300"
         rounded
@@ -17,8 +17,8 @@
           <q-icon name="search" />
         </template>
       </q-input>
-      <q-btn @click="isDialogOpen = true">Adicionar Aluno</q-btn>
-      <q-btn @click="RefreshList" icon="refresh" />
+      <q-btn class="btns" @click="isDialogOpen = true">Adicionar Aluno</q-btn>
+      <q-btn class="btns" @click="RefreshList" icon="refresh" />
     </div>
 
     <q-card>
@@ -183,5 +183,10 @@ const columns = [
 
 .list-query {
   width: 35vw;
+}
+
+.btns {
+  background-color: var(--header-bg);
+  color: var(--header-text-color);
 }
 </style>

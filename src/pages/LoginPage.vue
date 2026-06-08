@@ -74,7 +74,6 @@ export default {
   align-items: center;
   justify-content: center;
   height: 94vh;
-  background-color: #f0f0f0;
 }
 
 .login-card {
@@ -94,7 +93,6 @@ export default {
   .login-page {
     padding: 24px 12px;
     height: auto;
-    background-color: #fafafa;
     align-items: center;
     justify-content: center;
   }

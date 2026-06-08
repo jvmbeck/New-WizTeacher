@@ -14,9 +14,8 @@
   margin-top: 2rem;
 }
 
-button {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  cursor: pointer;
+.q-btn {
+  background-color: var(--header-bg);
+  color: var(--header-text-color);
 }
 </style>
