@@ -1,27 +1,26 @@
 <template>
   <div class="q-pa-md">
-    <q-btn to="/TeacherDashboard">To Teacher Dashboard</q-btn>
+    <q-btn class="btns" to="/TeacherDashboard">To Teacher Dashboard</q-btn>
     <h5 class="classTile">{{ classInfo?.className }}</h5>
     <div class="class-header q-mb-md">
       <q-btn
+        class="btns"
         v-if="$q.screen.gt.sm"
-        color="primary"
         icon="content_copy"
         label="Copy All"
         @click="copyAllStudentsInfo"
       />
       <q-btn
-        color="primary"
+        class="btns"
         icon="email"
         label="Send Email Report"
         @click="sendEmailReport"
         disabled
       />
       <q-btn
-        color="primary"
         icon="rate_review"
         label="Grade Homework"
-        class="q-mt-md"
+        class="btns"
         @click="isSaveHomeworkFormOpen = true"
       ></q-btn>
     </div>
@@ -72,8 +71,11 @@
           <div class="row items-center q-gutter-sm">
             <q-chip
               dense
-              :color="student.hasCurrentLessonSaved ? 'green-6' : 'grey-10'"
-              text-color="white"
+              :style="{
+                backgroundColor: student.hasCurrentLessonSaved
+                  ? '#43a047'
+                  : 'var(--status-unsaved)',
+              }"
               outline
             >
               <q-icon
@@ -86,8 +88,9 @@
             <q-chip
               dense
               v-if="getNextLessonLabel(student.currentLesson, student.book)"
-              :color="student.hasNextLessonSaved ? 'green-6' : 'grey-10'"
-              text-color="white"
+              :style="{
+                backgroundColor: student.hasNextLessonSaved ? '#43a047' : 'var(--status-unsaved)',
+              }"
               outline
             >
               <q-icon
@@ -500,6 +503,10 @@ onMounted(async () => {
 .lesson-saved {
   color: #21ba45; /* Quasar green */
   font-weight: bold;
+}
+
+.btns {
+  background-color: var(--header-bg);
 }
 
 /* Improve touch targets on mobile */

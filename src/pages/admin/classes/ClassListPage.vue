@@ -1,10 +1,10 @@
 <template>
   <q-page padding>
     <div class="buttons-container">
-      <q-btn to="/AdminDashboard" label="Início" />
+      <q-btn class="btns" to="/AdminDashboard" label="Início" />
       <q-input
         v-model="searchQuery"
-        label="Buscar por nome da turma, professor ou tipo de aula"
+        label="Digite nome da turma, professor ou tipo de aula"
         outlined
         debounce="300"
         rounded
@@ -17,8 +17,8 @@
           <q-icon name="search" />
         </template>
       </q-input>
-      <q-btn label="Criar Turma" @click="openCreateClassDialog" />
-      <q-btn @click="RefreshList" icon="refresh" />
+      <q-btn class="btns" label="Criar Turma" @click="openCreateClassDialog" />
+      <q-btn class="btns" @click="RefreshList" icon="refresh" />
     </div>
 
     <q-card>
@@ -141,5 +141,10 @@ onMounted(async () => {
   justify-content: center;
   gap: 1rem;
   margin-bottom: 16px;
+}
+
+.btns {
+  background-color: var(--header-bg);
+  color: var(--header-text-color);
 }
 </style>

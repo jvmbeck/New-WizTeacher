@@ -19,6 +19,13 @@
           </div>
         </q-toolbar-title>
 
+        <!-- Dark Mode Toggle-->
+        <q-toggle
+          v-model="darkMode"
+          checked-icon="dark_mode"
+          unchecked-icon="light_mode"
+          color="primary"
+        />
         <!-- Avatar with Dropdown Menu -->
         <q-btn round color="white" class="q-ml-md">
           <q-avatar size="32px">
@@ -64,11 +71,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import AuthServices from 'src/services/AuthServices'
 import { useRouter } from 'vue-router'
-import { Notify } from 'quasar'
+import { Notify, useQuasar, LocalStorage } from 'quasar'
 import { useUserStore } from 'src/stores/userStore.js'
+
+const $q = useQuasar()
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.userInfo?.name || 'Usuário Desconhecido')
@@ -112,6 +121,22 @@ function logout() {
   console.log('Logging out...')
   router.push('/')
 }
+
+onMounted(() => {
+  const savedMode = LocalStorage.getItem('darkMode')
+
+  if (savedMode !== null) {
+    $q.dark.set(savedMode)
+  }
+})
+
+const darkMode = computed({
+  get: () => $q.dark.isActive,
+  set: (val) => {
+    $q.dark.set(val)
+    LocalStorage.set('darkMode', val)
+  },
+})
 </script>
 
 <style scoped>
