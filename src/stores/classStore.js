@@ -1,6 +1,7 @@
 // stores/classStore.js
 import { defineStore } from 'pinia'
 import ClassServices from '../services/classes/ClassServices.js'
+import { fetchAllClasses, fetchClassesByTeacher } from '../services/classes/classes.fetch.js'
 
 export const useClassStore = defineStore('classStore', {
   state: () => ({
@@ -42,8 +43,16 @@ export const useClassStore = defineStore('classStore', {
         return this.classes
       }
 
-      this.refreshClassesArray()
+      await this.refreshClassesArray()
       return this.classes
+    },
+    fetchClassesForTeacher(teacherId) {
+      if (this.classes.length > 0) {
+        console.log('CLASS STORE: \n\nClass array already exists. Returning array.')
+        return this.classes.filter((c) => c.teacherId === teacherId)
+      }
+
+      return fetchClassesByTeacher(teacherId)
     },
     async createClass(classData) {
       console.log('CLASS STORE: \n\nCreating new class')
@@ -52,7 +61,7 @@ export const useClassStore = defineStore('classStore', {
       return newClass
     },
     async refreshClassesArray() {
-      this.classes = await ClassServices.fetchAllClasses()
+      this.classes = await fetchAllClasses()
       console.log('CLASS STORE: \n\nFetching new class data from firestore.')
 
       return this.classes
