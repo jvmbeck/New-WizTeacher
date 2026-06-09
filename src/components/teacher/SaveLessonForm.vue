@@ -46,7 +46,7 @@
             v-model="lesson.homeworkPages"
             label="Homework Pages"
             stack-label
-            placeholder="Ex: 12-13, 15"
+            placeholder="Ex: 12-15 ou 12,13,14,15"
             class="q-mt-md"
             :disable="noHomework"
           />
