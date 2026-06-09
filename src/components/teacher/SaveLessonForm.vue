@@ -13,7 +13,14 @@
               <q-input v-model="lesson.book" label="Book" stack-label />
             </div>
             <div class="col-12 col-md-6">
-              <q-input v-model="lesson.lessonNumber" label="Lesson #" stack-label />
+              <q-select
+                v-model="lesson.lessonNumber"
+                :options="lessonNumberOptions"
+                label="Lesson #"
+                stack-label
+                emit-value
+                map-options
+              />
             </div>
           </div>
 
@@ -76,7 +83,8 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import bookStructure from 'src/data/bookStructure.json'
 
 const props = defineProps({
   book: String,
@@ -109,6 +117,25 @@ const gradeFields = [
   { key: 'gradeA', label: 'A' },
   { key: 'gradeL', label: 'L' },
 ]
+
+const lessonNumberOptions = computed(() => {
+  const book = lesson.value.book
+  const baseOptions = Array.isArray(bookStructure[book])
+    ? bookStructure[book].map((item) => ({ label: item, value: item }))
+    : []
+
+  const currentLesson = lesson.value.lessonNumber
+  if (!currentLesson) {
+    return baseOptions
+  }
+
+  const isCurrentInOptions = baseOptions.some((option) => option.value === currentLesson)
+  if (isCurrentInOptions) {
+    return baseOptions
+  }
+
+  return [{ label: currentLesson, value: currentLesson }, ...baseOptions]
+})
 
 // Watch for dialog open and fetch student data
 watch(
