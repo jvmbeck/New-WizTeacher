@@ -100,8 +100,13 @@ export async function saveLessonForStudent(studentId, lessonData) {
     fullLessonInfo.contractId = contractId
   }
 
-  batch.set(studentLessonRef, fullLessonInfo)
-  batch.set(globalLessonRef, fullLessonInfo)
+  // Never overwrite an existing homework grade with an empty value.
+  if (fullLessonInfo.gradeE === '' || fullLessonInfo.gradeE === null) {
+    delete fullLessonInfo.gradeE
+  }
+
+  batch.set(studentLessonRef, fullLessonInfo, { merge: true })
+  batch.set(globalLessonRef, fullLessonInfo, { merge: true })
 
   if (lessonNumber === currentLesson) {
     const { nextLesson } = getNextLesson(currentLesson, book)
