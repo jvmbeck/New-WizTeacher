@@ -37,13 +37,16 @@
 
       <!-- Add/Edit form -->
       <div class="row q-gutter-sm items-center">
-        <q-input
+        <q-select
           v-model="formLesson"
-          label="Lesson #"
-          type="number"
+          :options="lessonOptions"
+          label="Lesson"
           outlined
           dense
           style="width: 120px"
+          :disable="!selectedStudent"
+          emit-value
+          map-options
         />
         <q-select
           v-model="formGrade"
@@ -97,10 +100,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Notify } from 'quasar'
-import { doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore'
-import { db } from 'src/key/configKey'
+import { saveHomeworkGrades } from 'src/services/students'
+import bookStructure from 'src/data/bookStructure.json'
 
 const props = defineProps({
   students: {
@@ -120,6 +123,25 @@ const formLesson = ref('')
 const formGrade = ref('')
 const editIndex = ref(null)
 
+const lessonOptions = computed(() => {
+  const book = selectedStudent.value?.book
+  if (!book || !bookStructure[book]) return []
+
+  return bookStructure[book].map((lesson) => ({
+    label: lesson,
+    value: lesson,
+  }))
+})
+
+watch(selectedStudent, () => {
+  const isCurrentLessonValid = lessonOptions.value.some(
+    (option) => option.value === formLesson.value,
+  )
+  if (!isCurrentLessonValid) {
+    formLesson.value = ''
+  }
+})
+
 // Add new homework
 async function addEntry() {
   if (!selectedStudent.value) {
@@ -130,24 +152,7 @@ async function addEntry() {
     return
   }
 
-  const student = selectedStudent.value
-  const studentId = student.uid
-  const studentBook = student.book
   const lessonId = formLesson.value
-
-  // Check if the lesson exists in lessonsCompleted
-  const completedDocId = `students/${studentId}/lessons/${studentBook}_${lessonId}`
-  console.log('CompletedDocId: ' + completedDocId)
-  const docRef = doc(db, completedDocId)
-  const completedSnap = await getDoc(docRef)
-
-  if (!completedSnap.exists()) {
-    Notify.create({
-      type: 'negative',
-      message: `Lesson ${lessonId} has not been completed yet. Cannot grade homework.`,
-    })
-    return
-  }
 
   // Add the entry if validation passed
   homeworkList.value.push({
@@ -190,42 +195,18 @@ async function saveGrades() {
   if (!selectedStudent.value) return
 
   const student = selectedStudent.value
-  const studentId = student.uid
+  const studentId = student.uid || student.id
   const studentBook = student.book
-
-  const batch = writeBatch(db)
-
-  for (const hw of homeworkList.value) {
-    const lessonId = hw.lesson
-    const grade = hw.grade
-
-    const completedDocId = `${studentBook}_${lessonId}_${studentId}`
-
-    // Update the lessonsCompleted record
-    const completedDocRef = doc(db, 'lessonsCompleted', completedDocId)
-    batch.set(
-      completedDocRef,
-      {
-        gradeE: grade,
-        hwGradedAt: serverTimestamp(),
-      },
-      { merge: true },
-    )
-
-    // Update the student's subcollection record
-    const studentLessonRef = doc(db, 'students', studentId, 'lessons', `${studentBook}_${lessonId}`)
-    batch.set(
-      studentLessonRef,
-      {
-        gradeE: grade,
-        hwGradedAt: serverTimestamp(),
-      },
-      { merge: true },
-    )
-  }
+  const contractId = student.currentContractId || null
 
   try {
-    await batch.commit()
+    await saveHomeworkGrades({
+      studentId,
+      studentBook,
+      contractId,
+      hwPages: homeworkList.value,
+    })
+
     Notify.create({
       type: 'positive',
       message: 'Homework grades saved successfully!',

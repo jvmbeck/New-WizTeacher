@@ -108,7 +108,6 @@ const gradeFields = [
   { key: 'gradeF', label: 'F' },
   { key: 'gradeA', label: 'A' },
   { key: 'gradeL', label: 'L' },
-  { key: 'gradeE', label: 'E' },
 ]
 
 // Watch for dialog open and fetch student data

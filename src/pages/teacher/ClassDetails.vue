@@ -194,11 +194,11 @@ import {
   fetchStudentsByIds,
 } from 'src/services/students/index'
 import classServices from '../../services/classes/ClassServices.js'
-import SaveLessonForm from 'src/components/SaveLessonForm.vue'
+import SaveLessonForm from 'src/components/teacher/SaveLessonForm.vue'
 import BookStructure from '../../data/bookStructure.json'
 import { useQuasar } from 'quasar'
 import emailServices from 'src/services/EmailServices.js'
-import HwGradingForm from 'src/components/HwGradingForm.vue'
+import HwGradingForm from 'src/components/teacher/HwGradingForm.vue'
 import { getNextClassDayKey, isToday } from 'src/utils/dateHelpers.js'
 
 const $q = useQuasar()
