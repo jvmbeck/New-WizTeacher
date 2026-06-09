@@ -73,10 +73,14 @@
               dense
               :style="{
                 backgroundColor: student.hasCurrentLessonSaved
-                  ? '#43a047'
-                  : 'var(--status-unsaved)',
+                  ? 'var(--saved-lesson)'
+                  : 'transparent',
+                color: student.hasCurrentLessonSaved ? '#ffffff' : 'var(--status-unsaved-outline)',
+                borderColor: student.hasCurrentLessonSaved
+                  ? 'transparent'
+                  : 'var(--status-unsaved-outline)',
               }"
-              outline
+              :outline="!student.hasCurrentLessonSaved"
             >
               <q-icon
                 :name="student.hasCurrentLessonSaved ? 'check_circle' : 'hourglass_empty'"
@@ -89,9 +93,13 @@
               dense
               v-if="getNextLessonLabel(student.currentLesson, student.book)"
               :style="{
-                backgroundColor: student.hasNextLessonSaved ? '#43a047' : 'var(--status-unsaved)',
+                backgroundColor: student.hasNextLessonSaved ? 'var(--saved-lesson)' : 'transparent',
+                color: student.hasNextLessonSaved ? '#ffffff' : 'var(--status-unsaved-outline)',
+                borderColor: student.hasNextLessonSaved
+                  ? 'transparent'
+                  : 'var(--status-unsaved-outline)',
               }"
-              outline
+              :outline="!student.hasNextLessonSaved"
             >
               <q-icon
                 :name="student.hasNextLessonSaved ? 'check_circle' : 'hourglass_empty'"
@@ -507,6 +515,7 @@ onMounted(async () => {
 
 .btns {
   background-color: var(--header-bg);
+  color: var(--header-text-color);
 }
 
 /* Improve touch targets on mobile */

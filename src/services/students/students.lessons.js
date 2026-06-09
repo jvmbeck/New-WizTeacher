@@ -68,6 +68,9 @@ export async function saveLessonForStudent(studentId, lessonData) {
       const existingData = lessonSnap.data()
       if (existingData.completedAt) {
         fullLessonInfo.completedAt = existingData.completedAt
+      } else {
+        // HW-only rows can exist without completedAt; set it on first full lesson save.
+        fullLessonInfo.completedAt = serverTimestamp()
       }
     } else {
       // Only add new completedAt for new lessons
