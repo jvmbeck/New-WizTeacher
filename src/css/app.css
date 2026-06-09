@@ -13,6 +13,7 @@
   --text-color: #212121;
   --status-unsaved: #616161;
   --placeholder-lesson: #cecccc;
+  --saved-lesson: #4caf50;
 }
 
 .body--dark {
@@ -23,6 +24,7 @@
   --text-color: #ffffff;
   --status-unsaved: #616161;
   --placeholder-lesson: #464646;
+  --saved-lesson: #4caf50;
 }
 
 body {
