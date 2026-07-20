@@ -38,6 +38,15 @@
           separator="cell"
           :pagination="{ rowsPerPage: 0 }"
         >
+          <!-- Student Count Column -->
+          <template v-slot:body-cell-studentCount="props">
+            <q-td :props="props" class="text-center">
+              {{ props.row.studentIds?.length ?? 0 }}
+              <span class="waiting-list"> + {{ props.row.waitingList?.length ?? 0 }} </span>
+            </q-td>
+          </template>
+
+          <!-- Actions Column -->
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
               <q-btn
@@ -116,7 +125,7 @@ const columns = [
     name: 'studentCount',
     label: 'Qtd. de Alunos',
     align: 'center',
-    field: (row) => (Array.isArray(row.studentIds) ? row.studentIds.length : 0),
+    field: 'studentIds', // or even just field: row => row
   },
   { name: 'actions', label: 'Ações', align: 'center', field: 'actions' },
 ]
@@ -146,5 +155,10 @@ onMounted(async () => {
 .btns {
   background-color: var(--header-bg);
   color: var(--header-text-color);
+}
+
+.waiting-list {
+  color: var(--waiting-list-color);
+  font-weight: bold;
 }
 </style>
