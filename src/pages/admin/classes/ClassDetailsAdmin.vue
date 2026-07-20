@@ -67,128 +67,112 @@
       />
 
       <q-card-section>
-        <div class="text-subtitle1 q-mb-sm">Alunos</div>
-        <q-tabs
-          v-model="studentsTab"
-          dense
-          align="left"
-          active-color="primary"
-          indicator-color="primary"
-        >
-          <q-tab name="students" :label="`Turma (${students.length})`" />
-          <q-tab name="waiting" :label="`Lista de espera (${waitingListStudents.length})`" />
-        </q-tabs>
+        <div class="text-subtitle1 q-mb-sm text-weight-bold">Alunos</div>
 
-        <q-separator class="q-my-sm" />
+        <q-list bordered>
+          <q-item v-for="student in students" :key="student.id">
+            <q-item-section>
+              <q-item-label
+                >{{ student.name }}
+                <q-badge v-if="student.isReplenishment" color="orange" class="q-ml-sm">
+                  Reposição
+                </q-badge>
 
-        <q-tab-panels v-model="studentsTab" animated>
-          <q-tab-panel name="students" class="q-pa-none">
-            <q-list bordered>
-              <q-item v-for="student in students" :key="student.id">
-                <q-item-section>
-                  <q-item-label
-                    >{{ student.name }}
-                    <q-badge v-if="student.isReplenishment" color="orange" class="q-ml-sm">
-                      Reposição
-                    </q-badge>
+                <q-badge v-if="student.isUnscheduled" color="grey" class="q-ml-sm">
+                  Desmarcado
+                </q-badge></q-item-label
+              >
+              <q-item-label caption>ID: {{ student.id }}</q-item-label>
+            </q-item-section>
 
-                    <q-badge v-if="student.isUnscheduled" color="grey" class="q-ml-sm">
-                      Desmarcado
-                    </q-badge></q-item-label
-                  >
-                  <q-item-label caption>ID: {{ student.id }}</q-item-label>
-                </q-item-section>
+            <q-item-section side>
+              <div class="row q-gutter-sm">
+                <q-btn
+                  label="Ver detalhes"
+                  flat
+                  color="primary"
+                  icon="visibility"
+                  @click="openStudentDialog(student.id)"
+                >
+                  <q-tooltip>Ver detalhes</q-tooltip>
+                </q-btn>
 
-                <q-item-section side>
-                  <div class="row q-gutter-sm">
-                    <q-btn
-                      label="Ver detalhes"
-                      flat
-                      color="primary"
-                      icon="visibility"
-                      @click="openStudentDialog(student.id)"
-                    >
-                      <q-tooltip>Ver detalhes</q-tooltip>
-                    </q-btn>
+                <q-btn
+                  v-if="!student.isReplenishment"
+                  label="Desmarcar aulas"
+                  flat
+                  color="negative"
+                  icon="event_busy"
+                  @click="openUnscheduleDialog(student)"
+                >
+                  <q-tooltip>Selecionar datas para desmarcar</q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="student.isReplenishment"
+                  label="Editar reposição"
+                  flat
+                  color="primary"
+                  icon="event"
+                  @click="openAddReplenishmentStudentDialog(student.id)"
+                >
+                  <q-tooltip>Editar datas de reposição</q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="student.isMainStudent"
+                  class="waiting-list"
+                  label="Lista de espera"
+                  flat
+                  icon="schedule"
+                  @click="moveStudentToWaitingList(student)"
+                >
+                  <q-tooltip>Mover aluno para lista de espera</q-tooltip>
+                </q-btn>
+              </div>
+            </q-item-section>
+          </q-item>
 
-                    <q-btn
-                      v-if="!student.isReplenishment"
-                      label="Desmarcar aulas"
-                      flat
-                      color="negative"
-                      icon="event_busy"
-                      @click="openUnscheduleDialog(student)"
-                    >
-                      <q-tooltip>Selecionar datas para desmarcar</q-tooltip>
-                    </q-btn>
-                    <q-btn
-                      v-if="student.isReplenishment"
-                      label="Editar reposição"
-                      flat
-                      color="primary"
-                      icon="event"
-                      @click="openAddReplenishmentStudentDialog(student.id)"
-                    >
-                      <q-tooltip>Editar datas de reposição</q-tooltip>
-                    </q-btn>
-                    <q-btn
-                      v-if="student.isMainStudent"
-                      label="Lista de espera"
-                      flat
-                      color="warning"
-                      icon="schedule"
-                      @click="moveStudentToWaitingList(student)"
-                    >
-                      <q-tooltip>Mover aluno para lista de espera</q-tooltip>
-                    </q-btn>
-                  </div>
-                </q-item-section>
-              </q-item>
+          <q-item v-if="students.length === 0">
+            <q-item-section>Nenhum aluno encontrado.</q-item-section>
+          </q-item>
+        </q-list>
 
-              <q-item v-if="students.length === 0">
-                <q-item-section>Nenhum aluno encontrado.</q-item-section>
-              </q-item>
-            </q-list>
-          </q-tab-panel>
+        <div class="text-subtitle1 q-mb-sm q-mt-md text-weight-bold">Lista de Espera</div>
 
-          <q-tab-panel name="waiting" class="q-pa-none">
-            <q-list bordered>
-              <q-item v-for="student in waitingListStudents" :key="`waiting-${student.id}`">
-                <q-item-section>
-                  <q-item-label>{{ student.name }}</q-item-label>
-                  <q-item-label caption>ID: {{ student.id }}</q-item-label>
-                </q-item-section>
+        <q-list bordered>
+          <q-item v-for="student in waitingListStudents" :key="`waiting-${student.id}`">
+            <q-item-section>
+              <q-item-label>{{ student.name }}</q-item-label>
+              <q-item-label caption>ID: {{ student.id }}</q-item-label>
+            </q-item-section>
 
-                <q-item-section side>
-                  <div class="row q-gutter-sm">
-                    <q-btn
-                      label="Ver detalhes"
-                      flat
-                      color="primary"
-                      icon="visibility"
-                      @click="openStudentDialog(student.id)"
-                    >
-                      <q-tooltip>Ver detalhes</q-tooltip>
-                    </q-btn>
-                    <q-btn
-                      label="Restaurar para turma"
-                      flat
-                      color="positive"
-                      icon="person_add"
-                      @click="restoreStudentToClass(student)"
-                    >
-                      <q-tooltip>Remover da lista de espera e voltar para turma</q-tooltip>
-                    </q-btn>
-                  </div>
-                </q-item-section>
-              </q-item>
+            <q-item-section side>
+              <div class="row q-gutter-sm">
+                <q-btn
+                  label="Ver detalhes"
+                  flat
+                  color="primary"
+                  icon="visibility"
+                  @click="openStudentDialog(student.id)"
+                >
+                  <q-tooltip>Ver detalhes</q-tooltip>
+                </q-btn>
+                <q-btn
+                  label="Restaurar para turma"
+                  flat
+                  color="positive"
+                  icon="person_add"
+                  @click="restoreStudentToClass(student)"
+                >
+                  <q-tooltip>Remover da lista de espera e voltar para turma</q-tooltip>
+                </q-btn>
+              </div>
+            </q-item-section>
+          </q-item>
 
-              <q-item v-if="waitingListStudents.length === 0">
-                <q-item-section>Nenhum aluno na lista de espera.</q-item-section>
-              </q-item>
-            </q-list>
-          </q-tab-panel>
-        </q-tab-panels>
+          <q-item v-if="waitingListStudents.length === 0">
+            <q-item-section>Nenhum aluno na lista de espera.</q-item-section>
+          </q-item>
+        </q-list>
       </q-card-section>
     </q-card>
 
@@ -391,7 +375,6 @@ const isAddDialogOpen = ref(false)
 const isAddReplenishmentDialogOpen = ref(false)
 const selectedStudentId = ref(null)
 const selectedReplenishmentDates = ref([])
-const studentsTab = ref('students')
 // details dialog state
 const detailStudentId = ref(null)
 const isDetailsOpen = ref(false)
@@ -847,5 +830,10 @@ function filterStudents(val, update) {
 .grades-cell > div:last-child {
   border-right: none;
   margin-right: 0;
+}
+
+.waiting-list {
+  color: var(--waiting-list-color);
+  font-weight: bold;
 }
 </style>
