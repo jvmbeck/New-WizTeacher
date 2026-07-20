@@ -14,6 +14,7 @@
   --status-unsaved: #616161;
   --placeholder-lesson: #cecccc;
   --saved-lesson: #4caf50;
+  --waiting-list-color: #e95804;
 }
 
 .body--dark {
@@ -25,6 +26,7 @@
   --status-unsaved: #616161;
   --placeholder-lesson: #464646;
   --saved-lesson: #4caf50;
+  --waiting-list-color: #ff9800;
 }
 
 body {
